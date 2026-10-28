@@ -25,6 +25,7 @@ HTML, CSS y JavaScript sin framework ni compilación. Los módulos ES se cargan 
 | `.github/workflows/avisos.yml` | Ejecuta `notify/send.mjs` cada 10 min |
 | `.github/workflows/publicar.yml` | Publica en Firebase Hosting al subir a `main` |
 | `.github/workflows/correo.yml` | Recibe el resumen de Gmail cifrado y lo guarda (`notify/correo.mjs`) |
+| `.github/workflows/importar.yml` | Mete datos cifrados en la cuenta del usuario (`notify/importar.mjs`): `{ email, add: { lista: [elementos con id fijo] } }`. Así se cargó su horario desde una foto |
 
 ### Vistas
 

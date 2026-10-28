@@ -2,7 +2,8 @@
 // lo descifra con la clave de la cuenta de servicio, lo guarda en users/{uid}.mail y avisa al móvil.
 // Sin datos, imprime la clave pública que usa notify/cifrar.mjs.
 import admin from 'firebase-admin';
-import { privateDecrypt, createDecipheriv, createPublicKey, constants } from 'node:crypto';
+import { createPublicKey } from 'node:crypto';
+import { abrir } from './caja.mjs';
 
 const MAX = 40; // correos como mucho por resumen
 const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || 'null');
@@ -14,12 +15,7 @@ if (!raw) {
   process.exit(0);
 }
 
-const box = JSON.parse(Buffer.from(raw, 'base64').toString());
-const b = (x) => Buffer.from(x, 'base64');
-const key = privateDecrypt({ key: sa.private_key, padding: constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' }, b(box.k));
-const dc = createDecipheriv('aes-256-gcm', key, b(box.iv));
-dc.setAuthTag(b(box.t));
-const data = JSON.parse(Buffer.concat([dc.update(b(box.d)), dc.final()]).toString());
+const data = abrir(raw, sa.private_key);
 
 const str = (v, n) => String(v ?? '').slice(0, n);
 const items = (Array.isArray(data.items) ? data.items : []).slice(0, MAX).map((x) => ({

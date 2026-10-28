@@ -1,0 +1,29 @@
+name: Importar
+
+# Lo lanza Claude para meter datos en la cuenta del usuario (por ejemplo, su horario de clases).
+# Los datos van cifrados con notify/cifrar.mjs, como el resumen de correo.
+on:
+  workflow_dispatch:
+    inputs:
+      datos:
+        description: Datos cifrados
+        required: true
+
+concurrency:
+  group: importar
+  cancel-in-progress: false
+
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm install --prefix notify --no-audit --no-fund
+      - run: node notify/importar.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          DATOS: ${{ inputs.datos }}
