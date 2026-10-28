@@ -1,7 +1,7 @@
 {
   "hosting": {
     "public": ".",
-    "ignore": ["firebase.json", ".firebaserc", "LEEME.md", "package.json", "notify/**", "**/.*", "**/node_modules/**"],
+    "ignore": ["firebase.json", ".firebaserc", "LEEME.md", "CLAUDE.md", "package.json", "notify/**", "**/.*", "**/node_modules/**"],
     "headers": [
       { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
     ]
