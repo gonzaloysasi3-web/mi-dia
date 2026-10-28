@@ -11,6 +11,16 @@ const nextWeekday = (base, w, skipToday = false) => {
   return addDays(base, n);
 };
 
+/* ---------- Horario de clases ---------- */
+// clase = { name, days: [0-6], start: 'HH:MM', end: 'HH:MM', place, until?: 'AAAA-MM-DD' }
+// Devuelve las clases de un día como elementos virtuales (no se guardan) de tipo 'class'.
+export const classesOn = (classes, d) => {
+  const w = parse(d).getDay();
+  return classes
+    .filter((c) => !c.del && c.days?.includes(w) && (!c.until || d <= c.until))
+    .map((c) => ({ id: `cls:${c.id}`, cls: c, type: 'class', title: c.name, time: c.start, end: c.end, place: c.place, date: d, prio: 0 }));
+};
+
 /* ---------- Repeticiones ---------- */
 // repeat = { f: 'day' | 'weekdays' | 'week' | 'month', n?: número, days?: [0-6] }
 export function occurs(it, d) {

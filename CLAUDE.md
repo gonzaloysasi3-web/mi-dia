@@ -1,6 +1,6 @@
 # Mi día
 
-Dashboard personal de organización diaria (tareas, citas, exámenes, estudio, hábitos, contadores, biblioteca de libros y juegos, cartera de ingresos y gastos). Es una PWA en español que se usa en móvil y ordenador.
+Dashboard personal de organización diaria (tareas, citas, exámenes, estudio, hábitos, contadores, biblioteca de libros y juegos, cartera de ingresos y gastos, horario de clases). Es una PWA en español que se usa en móvil y ordenador.
 
 - Web publicada: https://mi-dia-467b1.web.app
 - Repositorio: https://github.com/gonzaloysasi3-web/mi-dia
@@ -28,15 +28,16 @@ HTML, CSS y JavaScript sin framework ni compilación. Los módulos ES se cargan 
 
 ### Vistas
 
-`inicio`, `hoy`, `semana`, `examenes`, `habitos`, `biblioteca`, `cartera`, `contadores`, `revision`, `ajustes`, `mas`. Cada una es una función `viewX()` en `app.js` que devuelve `{ title, sub, html }`; `render()` pinta la actual. Las acciones van por delegación de eventos con `data-act` en `#view`.
+`inicio`, `hoy`, `semana`, `examenes`, `horario`, `habitos`, `biblioteca`, `cartera`, `contadores`, `revision`, `ajustes`, `mas`. Cada una es una función `viewX()` en `app.js` que devuelve `{ title, sub, html }`; `render()` pinta la actual. Las acciones van por delegación de eventos con `data-act` en `#view`.
 
 En móvil la barra inferior muestra Inicio, Hoy, Semana, Exámenes y Más; el resto (`.nav-extra`) va dentro de Más. En escritorio (≥ 880 px) todo está en la barra lateral.
 
 ### Datos
 
-Estado local en `localStorage` (`midia.v1`) con seis listas: `items`, `habits`, `focus`, `counters`, `library`, `wallet`. Cada elemento tiene `id` y `u` (marca de tiempo). Los borrados se marcan con `del: true` y se purgan a los 30 días. Al sincronizar se fusiona por elemento y gana el `u` más reciente.
+Estado local en `localStorage` (`midia.v1`) con siete listas: `items`, `habits`, `focus`, `counters`, `library`, `wallet`, `classes`. Cada elemento tiene `id` y `u` (marca de tiempo). Los borrados se marcan con `del: true` y se purgan a los 30 días. Al sincronizar se fusiona por elemento y gana el `u` más reciente.
 
 - `items`: `type` (`task` | `event` | `exam`), `title`, `date`, `time`, `place`, `prio` (0-2), `done`, `tags[]`, `repeat` (`{ f: 'day'|'weekdays'|'week'|'month', n, days[] }`), `doneOn{fecha:1}` para repetidas, `subs[]` (subtareas o temas de examen, con `done` y `doneAt`).
+- `classes`: horario `{ name, days: [0-6], start, end, place, until? }`. `classesOn()` (en `quick.js`, compartido con `notify/plan.mjs`) las convierte en elementos virtuales de tipo `class` para cada día: salen en Hoy, Semana, Inicio y la lista del calendario (sin punto en la cuadrícula), tienen aviso antes como las citas y su color sigue al nombre (`tagSlot`). No cuentan en «Semana: N elementos».
 - Elementos virtuales que no se guardan: `study` y `review` (plan de estudio que reparte los temas de cada examen) y `gcal` (eventos de Google Calendar, en caché en `midia.gcal`).
 - `focus`: registros de Pomodoro `{ ref, label, date, min }`.
 - `counters`: `{ name, unit, step, goal, log{fecha:cantidad} }`.

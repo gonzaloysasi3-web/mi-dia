@@ -1,6 +1,6 @@
 import * as sync from './sync.js';
 import { pad, ymd, parse, today, addDays, diffDays } from './dates.js';
-import { parseQuick, itemsOn, repeatLabel, encodeRepeat, decodeRepeat } from './quick.js';
+import { parseQuick, itemsOn, classesOn, repeatLabel, encodeRepeat, decodeRepeat } from './quick.js';
 
 const KEY = 'midia.v1';
 const $ = (s, r = document) => r.querySelector(s);
@@ -20,7 +20,7 @@ const mondayOf = (s) => addDays(s, -((parse(s).getDay() + 6) % 7));
 
 /* ---------- Estado (local primero; la sincronización es opcional) ---------- */
 const uid = () => crypto.randomUUID?.() ?? Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-const LISTS = ['items', 'habits', 'focus', 'counters', 'library', 'wallet'];
+const LISTS = ['items', 'habits', 'focus', 'counters', 'library', 'wallet', 'classes'];
 const empty = () => Object.fromEntries(LISTS.map((k) => [k, []]));
 
 function load() {
@@ -101,12 +101,20 @@ function studyPlan(items) {
   return plan;
 }
 let GCAL = {};
-const dayItems = (items, d, withPlan = true) => (withPlan ? [...itemsOn(items, d), ...(PLAN[d] || []), ...(GCAL[d] || [])] : itemsOn(items, d));
+const dayItems = (items, d, withPlan = true) => (withPlan ? [...itemsOn(items, d), ...(PLAN[d] || []), ...(GCAL[d] || []), ...classesOn(state.classes, d)] : itemsOn(items, d));
 const isTodo = (i) => (i.type === 'task' || i.type === 'study') && !i.done;
+// Resumen corto de un día sin tareas pendientes: las clases no cuentan como «hecho».
+const dayDone = (its) => (its.some((i) => i.type !== 'class') ? 'Todo hecho' : its.length ? plural(its.length, ['clase', 'clases']) : 'Sin planes');
 
 // tt: texto de la columna de hora; null = sin columna
 function row(it, tt) {
   if (it.type === 'study' || it.type === 'review') return studyRow(it, tt);
+  if (it.type === 'class') {
+    return `<li class="row${tt === null ? ' notime' : ''}">
+      ${tt === null ? '' : `<span class="time">${tt}</span>`}<span class="lead" style="color:var(--t${tagSlot(it.title)})">${icon('class')}</span>
+      <button type="button" class="body" data-act="clsedit" data-id="${it.cls.id}"><span class="title">${esc(it.title)}</span><span class="meta">${['Clase', it.end && `hasta las ${it.end}`, it.place && esc(it.place)].filter(Boolean).join(' · ')}</span></button>
+    </li>`;
+  }
   if (it.type === 'gcal') {
     return `<li class="row${tt === null ? ' notime' : ''}">
       ${tt === null ? '' : `<span class="time">${tt}</span>`}<span class="lead gcal">${icon('event')}</span>
@@ -209,7 +217,7 @@ function viewHoy() {
   const pending = todays.filter(isTodo).length;
   const next = todays.filter((i) => i.time && i.time >= now && !i.done).sort(sortDay)[0];
   const bits = [];
-  bits.push(pending ? `${pending} por hacer` : todays.length ? 'Todo hecho' : 'Sin planes');
+  bits.push(pending ? `${pending} por hacer` : dayDone(todays));
   if (next) bits.push(`siguiente a las ${next.time}`);
 
   const overdue = items.filter((i) => i.type === 'task' && !i.repeat && !i.done && i.date < t).sort((a, b) => a.date.localeCompare(b.date));
@@ -391,13 +399,13 @@ function viewInicio() {
   const todays = dayItems(items, t);
   const pending = todays.filter(isTodo).length;
   const wk = mondayOf(t);
-  const weekCount = [0, 1, 2, 3, 4, 5, 6].reduce((s, k) => s + dayItems(items, addDays(wk, k)).length, 0);
+  const weekCount = [0, 1, 2, 3, 4, 5, 6].reduce((s, k) => s + dayItems(items, addDays(wk, k)).filter((i) => i.type !== 'class').length, 0);
   const exams = items.filter((i) => i.type === 'exam' && !i.repeat && i.date >= t).sort((a, b) => a.date.localeCompare(b.date) || sortDay(a, b));
   const habitsDone = habits.filter((h) => h.log[t]).length;
-  const next = todays.filter((i) => !i.done && (!i.time || i.time >= now)).sort(sortDay).slice(0, 5);
+  const next = todays.filter((i) => !i.done && (!i.time || i.time >= now || (i.end && i.end > now))).sort(sortDay).slice(0, 5);
 
   const tiles = [
-    ['hoy', 'hoy', 'Hoy', pending ? `${pending} por hacer` : todays.length ? 'Todo hecho' : 'Sin planes'],
+    ['hoy', 'hoy', 'Hoy', pending ? `${pending} por hacer` : dayDone(todays)],
     ['semana', 'semana', 'Semana', weekCount ? plural(weekCount, ['elemento', 'elementos']) : 'Libre'],
     ['examenes', 'exam', 'Exámenes', exams.length ? plural(exams.length, ['próximo', 'próximos']) : 'Ninguno'],
     ['habitos', 'habitos', 'Hábitos', habits.length ? `${habitsDone} de ${habits.length} hoy` : 'Sin hábitos'],
@@ -442,7 +450,7 @@ function viewInicio() {
 /* ---------- Hoy: bloques de tiempo ---------- */
 let hoyMode = getPref('hoyMode', 'list');
 let blockSel = null;
-const fixedBlock = (i) => i.type === 'study' || i.type === 'review' || i.type === 'gcal';
+const fixedBlock = (i) => i.type === 'study' || i.type === 'review' || i.type === 'gcal' || i.type === 'class';
 
 function blocksHtml(todays) {
   const loose = todays.filter((i) => !i.time && !i.done && !fixedBlock(i));
@@ -664,6 +672,81 @@ function addCounter(e) {
   commit();
 }
 
+/* ---------- Horario de clases ---------- */
+const WD_ORDER = [1, 2, 3, 4, 5, 6, 0];
+const WD_SHORT = { 1: 'L', 2: 'M', 3: 'X', 4: 'J', 5: 'V', 6: 'S', 0: 'D' };
+const WD_NAME = { 1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado', 0: 'Domingo' };
+const activeClasses = () => live(state.classes).filter((c) => !c.until || c.until >= today());
+function classSummary() {
+  const n = activeClasses().length;
+  const next = classesOn(state.classes, today()).filter((c) => c.end > nowHM()).sort(sortDay)[0];
+  return next ? `${next.time < nowHM() ? 'Ahora' : `A las ${next.time}`}: ${next.title}` : n ? plural(n, ['asignatura', 'asignaturas']) : 'Añade tus clases';
+}
+function viewHorario() {
+  const t = today(), now = nowHM(), wd = parse(t).getDay();
+  const all = live(state.classes);
+  const todays = classesOn(state.classes, t).sort(sortDay);
+  const cur = todays.find((c) => c.time <= now && c.end > now);
+  const next = todays.find((c) => c.time > now);
+  let html = '';
+  if (cur || next) {
+    html += `<div class="banner cls-now"><p>${cur ? `<b>Ahora:</b> ${esc(cur.title)}${cur.place ? ` · ${esc(cur.place)}` : ''}, hasta las ${cur.end}` : ''}${cur && next ? '<br>' : ''}${next ? `<b>Siguiente:</b> ${esc(next.title)} a las ${next.time}${next.place ? ` · ${esc(next.place)}` : ''}` : ''}</p></div>`;
+  }
+  const days = WD_ORDER.filter((d) => d <= 5 && d >= 1 || all.some((c) => c.days?.includes(d)));
+  for (const d of days) {
+    const cs = all.filter((c) => c.days?.includes(d)).sort((a, b) => a.start.localeCompare(b.start));
+    html += `<h2 class="sec${d === wd ? ' cls-today' : ''}">${WD_NAME[d]}${d === wd ? ' · hoy' : ''}</h2>`;
+    html += cs.length ? `<ul class="group">${cs.map((c) => `<li class="row${c.until && c.until < t ? ' done' : ''}">
+      <span class="time">${c.start}</span><span class="lead" style="color:var(--t${tagSlot(c.name)})">${icon('class')}</span>
+      <button type="button" class="body" data-act="clsedit" data-id="${c.id}"><span class="title">${esc(c.name)}</span>
+      <span class="meta">${[`${c.start}–${c.end}`, c.place && esc(c.place), c.until && (c.until < t ? 'Terminada' : `Hasta el ${fShort(c.until)}`)].filter(Boolean).join(' · ')}</span></button></li>`).join('')}</ul>`
+      : '<p class="free">Sin clases</p>';
+  }
+  html += `<button type="button" class="btn lib-add" data-act="clsnew">${icon('plus')}Añadir clase</button>`;
+  const n = activeClasses().length;
+  return { title: 'Horario', sub: n ? `${plural(n, ['asignatura', 'asignaturas'])} · ${plural(todays.length, ['clase', 'clases'])} hoy` : 'Tus clases de la semana', html };
+}
+
+const clsDlg = $('#clsSheet');
+const clsForm = $('#clsForm');
+let clsEditing = null;
+function openClass(c) {
+  clsEditing = c;
+  clsForm.reset();
+  $('#clsTitle').textContent = c ? 'Editar clase' : 'Nueva clase';
+  clsForm.name.value = c?.name || '';
+  clsForm.start.value = c?.start || '09:00';
+  clsForm.end.value = c?.end || '10:30';
+  clsForm.place.value = c?.place || '';
+  clsForm.until.value = c?.until || '';
+  const days = c?.days || [];
+  clsForm.querySelectorAll('[name="day"]').forEach((x) => { x.checked = days.includes(Number(x.value)); });
+  $('#clsDel').hidden = !c;
+  clsDlg.showModal();
+  if (!c) clsForm.name.focus();
+}
+clsForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = new FormData(clsForm);
+  const name = String(f.get('name')).trim();
+  const days = f.getAll('day').map(Number);
+  const start = f.get('start'), end = f.get('end');
+  if (!name) return;
+  if (!days.length) return toast('Elige al menos un día.');
+  if (!start || !end || end <= start) return toast('La hora de fin tiene que ser después de la de inicio.');
+  const c = clsEditing ? { ...clsEditing } : { id: uid() };
+  Object.assign(c, { name, days, start, end, place: String(f.get('place')).trim(), until: f.get('until') || '' });
+  upsert(state.classes, c);
+  clsDlg.close();
+  commit();
+});
+$('#clsDel').addEventListener('click', () => {
+  const c = state.classes.find((y) => y.id === clsEditing.id);
+  clsDlg.close();
+  remove(state.classes, c, 'Clase eliminada');
+});
+clsDlg.addEventListener('click', (e) => { if (e.target === clsDlg || e.target.closest('[data-close]')) clsDlg.close(); });
+
 /* ---------- Cartera: ingresos y gastos ---------- */
 const WCATS = {
   in: ['Nómina', 'Cobro', 'Bizum', 'Reembolso', 'Otros'],
@@ -883,6 +966,8 @@ function viewRevision() {
       const n = its.filter((i) => (i.type === 'study' || i.type === 'review' ? 'task' : i.type === 'gcal' ? 'event' : i.type) === tp).length;
       return n ? plural(n, TYPES[tp]) : '';
     }).filter(Boolean);
+    const nc = its.filter((i) => i.type === 'class').length;
+    if (nc) parts.push(plural(nc, ['clase', 'clases']));
     html += `<li><span>${cap(fDay(d))}</span><strong>${parts.join(', ') || 'Libre'}</strong></li>`;
   }
   html += '</ul>';
@@ -947,7 +1032,7 @@ function viewAjustes() {
 }
 
 /* ---------- Más ---------- */
-const MORE_VIEWS = ['habitos', 'biblioteca', 'cartera', 'contadores', 'revision', 'ajustes', 'mas'];
+const MORE_VIEWS = ['horario', 'habitos', 'biblioteca', 'cartera', 'contadores', 'revision', 'ajustes', 'mas'];
 function navRow(v, ic, name, sum) {
   return `<li class="row notime"><span class="lead">${icon(ic)}</span>
     <button type="button" class="body" data-act="go" data-view="${v}"><span class="title">${name}</span>${sum ? `<span class="meta">${sum}</span>` : ''}</button>
@@ -956,6 +1041,7 @@ function navRow(v, ic, name, sum) {
 function viewMas() {
   const habits = live(state.habits);
   const html = `<ul class="group">
+    ${navRow('horario', 'class', 'Horario de clases', classSummary())}
     ${navRow('habitos', 'habitos', 'Hábitos', habits.length ? `${habits.filter((h) => h.log[today()]).length} de ${habits.length} hoy` : 'Sin hábitos')}
     ${navRow('biblioteca', 'library', 'Biblioteca', libSummary())}
     ${navRow('cartera', 'wallet', 'Cartera', walletSummary())}
@@ -968,7 +1054,7 @@ function viewMas() {
 
 const views = {
   inicio: viewInicio, hoy: viewHoy, semana: viewSemana, examenes: viewExamenes, habitos: viewHabitos,
-  biblioteca: viewBiblioteca, cartera: viewCartera, contadores: viewContadores, revision: viewRevision, ajustes: viewAjustes, mas: viewMas,
+  horario: viewHorario, biblioteca: viewBiblioteca, cartera: viewCartera, contadores: viewContadores, revision: viewRevision, ajustes: viewAjustes, mas: viewMas,
 };
 
 /* ---------- Avisos (mientras la app está abierta) ---------- */
@@ -1035,6 +1121,8 @@ function notifyCheck() {
       const n = todays.filter((i) => (i.type === 'study' || i.type === 'review' ? 'task' : i.type === 'gcal' ? 'event' : i.type) === tp).length;
       return n ? plural(n, TYPES[tp]) : '';
     }).filter(Boolean);
+    const nc = todays.filter((i) => i.type === 'class').length;
+    if (nc) parts.push(plural(nc, ['clase', 'clases']));
     const first = todays.filter((i) => i.time).sort(sortDay)[0];
     fire(`morning:${t}`, 'Tu día', parts.join(', ') + (first ? `. Lo primero, a las ${first.time}: ${first.title}.` : '.'));
   }
@@ -1400,6 +1488,8 @@ $('#view').addEventListener('click', (e) => {
   else if (act === 'libtab') { libTab = b.dataset.tab; setPref('libTab', libTab); render(); }
   else if (act === 'libnew') openLib(null);
   else if (act === 'walnew') openWallet(null);
+  else if (act === 'clsnew') openClass(null);
+  else if (act === 'clsedit') openClass(state.classes.find((x) => x.id === id));
   else if (act === 'walledit') openWallet(state.wallet.find((x) => x.id === id));
   else if (act === 'walmonth') {
     if (b.dataset.d === '0') walMonth = today().slice(0, 7);
@@ -1543,7 +1633,7 @@ setInterval(() => { if (!dlg.open && !libDlg.open && !['habitos', 'contadores', 
 setInterval(notifyCheck, 30000);
 setInterval(() => { if (gcalToken()) gcalFetch(); }, 15 * 60000);
 setTimeout(() => { notifyCheck(); if (gcalToken() && Date.now() - (gcalCache().at || 0) > 15 * 60000) gcalFetch(); }, 1500);
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !dlg.open && !libDlg.open && !walDlg.open) { render(); notifyCheck(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !dlg.open && !libDlg.open && !walDlg.open && !clsDlg.open) { render(); notifyCheck(); } });
 
 // Actualización automática: al volver a la app busca una versión nueva y, cuando se instala, recarga una vez.
 // Si hay una hoja abierta, espera a que se cierre para no perder lo que se está escribiendo.
@@ -1554,7 +1644,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   }).catch(() => {});
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadWorker) return;
-    const open = [dlg, libDlg, walDlg].find((d) => d.open);
+    const open = [dlg, libDlg, walDlg, clsDlg].find((d) => d.open);
     if (open) open.addEventListener('close', () => location.reload(), { once: true });
     else location.reload();
   });

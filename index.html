@@ -40,6 +40,7 @@
     <symbol id="i-library" viewBox="0 0 24 24"><path d="M5 4.5v15M9 4.5v15M13.5 5.5l4 13.5M3.5 19.5h17"/></symbol>
     <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H17v3"/><rect x="4" y="8" width="16" height="11" rx="2.5"/><path d="M16 13.5h.01" stroke-width="3"/></symbol>
     <symbol id="i-counter" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="3"/><path d="M7.5 12h4M9.5 10v4M14 12h3"/></symbol>
+    <symbol id="i-class" viewBox="0 0 24 24"><path d="M3 9.5 12 5l9 4.5-9 4.5Z"/><path d="M7 11.5V16c1.5 1.4 3.2 2 5 2s3.5-.6 5-2v-4.5M21 9.5V14"/></symbol>
     <symbol id="i-review" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16" rx="2.5"/><path d="M9 4.5V6h6V4.5M8.5 13l2.5 2.5 4.5-5"/></symbol>
     <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
     <symbol id="i-more" viewBox="0 0 24 24"><path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="3"/></symbol>
@@ -55,6 +56,7 @@
     <button type="button" data-view="hoy"><svg class="i" aria-hidden="true"><use href="#i-hoy"/></svg><span>Hoy</span></button>
     <button type="button" data-view="semana"><svg class="i" aria-hidden="true"><use href="#i-semana"/></svg><span>Semana</span></button>
     <button type="button" data-view="examenes"><svg class="i" aria-hidden="true"><use href="#i-exam"/></svg><span>Exámenes</span></button>
+    <button type="button" data-view="horario" class="nav-extra"><svg class="i" aria-hidden="true"><use href="#i-class"/></svg><span>Horario</span></button>
     <button type="button" data-view="habitos" class="nav-extra"><svg class="i" aria-hidden="true"><use href="#i-habitos"/></svg><span>Hábitos</span></button>
     <button type="button" data-view="biblioteca" class="nav-extra"><svg class="i" aria-hidden="true"><use href="#i-library"/></svg><span>Biblioteca</span></button>
     <button type="button" data-view="cartera" class="nav-extra"><svg class="i" aria-hidden="true"><use href="#i-wallet"/></svg><span>Cartera</span></button>
@@ -181,6 +183,40 @@
     <label class="field"><span>Notas</span><textarea name="notes" rows="3" maxlength="1000"></textarea></label>
     <div class="sheet-foot">
       <button type="button" id="libDel" class="danger" hidden><svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>Eliminar</button>
+      <button type="submit" class="btn">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="clsSheet" aria-labelledby="clsTitle">
+  <form id="clsForm" method="dialog" autocomplete="off">
+    <div class="sheet-head">
+      <h2 id="clsTitle">Nueva clase</h2>
+      <button type="button" class="text-btn" data-close>Cancelar</button>
+    </div>
+    <label class="field"><span>Asignatura</span><input name="name" required maxlength="80" placeholder="Métodos Cuantitativos"></label>
+    <fieldset class="field days-pick">
+      <legend>Días</legend>
+      <div class="days-row">
+        <label><input type="checkbox" name="day" value="1"><span>L</span><b class="sr">Lunes</b></label>
+        <label><input type="checkbox" name="day" value="2"><span>M</span><b class="sr">Martes</b></label>
+        <label><input type="checkbox" name="day" value="3"><span>X</span><b class="sr">Miércoles</b></label>
+        <label><input type="checkbox" name="day" value="4"><span>J</span><b class="sr">Jueves</b></label>
+        <label><input type="checkbox" name="day" value="5"><span>V</span><b class="sr">Viernes</b></label>
+        <label><input type="checkbox" name="day" value="6"><span>S</span><b class="sr">Sábado</b></label>
+        <label><input type="checkbox" name="day" value="0"><span>D</span><b class="sr">Domingo</b></label>
+      </div>
+    </fieldset>
+    <div class="two">
+      <label class="field"><span>Empieza</span><input type="time" name="start" required></label>
+      <label class="field"><span>Termina</span><input type="time" name="end" required></label>
+    </div>
+    <div class="two">
+      <label class="field"><span>Aula (opcional)</span><input name="place" maxlength="60" placeholder="Aula A3"></label>
+      <label class="field"><span>Fin de clases (opcional)</span><input type="date" name="until"></label>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" id="clsDel" class="danger" hidden><svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>Eliminar</button>
       <button type="submit" class="btn">Guardar</button>
     </div>
   </form>

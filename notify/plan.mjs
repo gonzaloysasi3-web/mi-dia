@@ -1,6 +1,6 @@
 // Decide qué avisos tocan ahora para un usuario. No toca la red: se puede probar con datos de ejemplo.
 import { addDays } from '../dates.js';
-import { itemsOn } from '../quick.js';
+import { itemsOn, classesOn } from '../quick.js';
 
 const LEAD_MIN = 20; // GitHub Actions puede retrasarse unos minutos: se avisa en los 20 min previos
 
@@ -18,7 +18,7 @@ const plural = (n, s, p) => `${n} ${n === 1 ? s : p}`;
 export function due(state, tz, sent = {}, date = new Date()) {
   const { day, min } = localNow(tz, date);
   const items = (state.items || []).filter((i) => !i.del);
-  const todays = itemsOn(items, day);
+  const todays = [...itemsOn(items, day), ...classesOn(state.classes || [], day)];
   const out = [];
   const add = (key, title, body) => { if (!sent[key]) out.push({ key, title, body }); };
 
@@ -43,6 +43,7 @@ export function due(state, tz, sent = {}, date = new Date()) {
       n('task') && plural(n('task'), 'tarea', 'tareas'),
       n('event') && plural(n('event'), 'cita', 'citas'),
       n('exam') && plural(n('exam'), 'examen', 'exámenes'),
+      n('class') && plural(n('class'), 'clase', 'clases'),
     ].filter(Boolean);
     const first = todays.filter((i) => i.time).sort((a, b) => (a.time < b.time ? -1 : 1))[0];
     add(`morning:${day}`, 'Tu día', parts.join(', ') + (first ? `. Lo primero, a las ${first.time}: ${first.title}.` : '.'));
