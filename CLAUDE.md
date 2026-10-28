@@ -49,7 +49,7 @@ En Firestore todo va en el documento `users/{uid}`: el campo `state` (JSON del e
 - Interfaz en español, estilo limpio tipo Apple, modo claro y oscuro automáticos. Fuente del sistema. Iconos SVG del sprite de `index.html` (sin emojis).
 - Colores siempre desde los tokens de `styles.css`. Los colores de tipo (`--c-task`, `--c-event`, `--c-exam`) y de etiqueta (`--t0`…`--t7`) son una paleta validada para daltonismo: no los cambies sin volver a validarla.
 - Zonas táctiles de al menos 44 px. Textos de usuario siempre escapados con `esc()`; en tooltips, con `textContent`.
-- **Cada vez que cambies un archivo de la app, sube la versión de `CACHE` en `sw.js`** (`midia-vN`). Si no, los móviles siguen con la versión antigua. Si añades un archivo que la app necesita, añádelo a `SHELL`.
+- **Cada vez que cambies un archivo de la app, sube la versión de `CACHE` en `sw.js`** (`midia-vN`). Si no, los móviles siguen con la versión antigua. Con la versión subida, la app se actualiza sola: al volver a ella busca el `sw.js` nuevo y recarga una vez (si hay una hoja abierta, espera a que se cierre). Si añades un archivo que la app necesita, añádelo a `SHELL`.
 - Si añades archivos que no deben publicarse, añádelos a `ignore` en `firebase.json`.
 - Cuidado con nombres de clase repetidos: `.seg` ya es el selector Tarea/Cita/Examen de la hoja.
 - Un `<input>` elimina los saltos de línea al asignar `value`: para texto con varias líneas, procésalo antes.

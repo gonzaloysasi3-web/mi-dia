@@ -1515,8 +1515,19 @@ setInterval(() => { if (!dlg.open && !libDlg.open && !['habitos', 'contadores', 
 setInterval(notifyCheck, 30000);
 setInterval(() => { if (gcalToken()) gcalFetch(); }, 15 * 60000);
 setTimeout(() => { notifyCheck(); if (gcalToken() && Date.now() - (gcalCache().at || 0) > 15 * 60000) gcalFetch(); }, 1500);
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !dlg.open && !libDlg.open) { render(); notifyCheck(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !dlg.open && !libDlg.open && !walDlg.open) { render(); notifyCheck(); } });
 
+// Actualización automática: al volver a la app busca una versión nueva y, cuando se instala, recarga una vez.
+// Si hay una hoja abierta, espera a que se cierre para no perder lo que se está escribiendo.
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  const hadWorker = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+  }).catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadWorker) return;
+    const open = [dlg, libDlg, walDlg].find((d) => d.open);
+    if (open) open.addEventListener('close', () => location.reload(), { once: true });
+    else location.reload();
+  });
 }
