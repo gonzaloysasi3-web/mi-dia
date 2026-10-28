@@ -24,6 +24,7 @@ HTML, CSS y JavaScript sin framework ni compilación. Los módulos ES se cargan 
 | `notify/` | Script de servidor para avisos con la app cerrada (`plan.mjs` decide, `send.mjs` envía por FCM) |
 | `.github/workflows/avisos.yml` | Ejecuta `notify/send.mjs` cada 10 min |
 | `.github/workflows/publicar.yml` | Publica en Firebase Hosting al subir a `main` |
+| `.github/workflows/correo.yml` | Recibe el resumen de Gmail cifrado y lo guarda (`notify/correo.mjs`) |
 
 ### Vistas
 
@@ -66,6 +67,15 @@ Al subir a `main`, el workflow `publicar.yml` despliega en Firebase Hosting usan
 3. `notify/plan.mjs` decide: hasta 20 min antes de lo que tenga hora (GitHub retrasa a veces el cron), el día antes de un examen desde las 9:00 y un resumen de 7:00 a 10:00 en la zona horaria del usuario.
 4. `sw.js` muestra el aviso. Mientras un dispositivo tenga token, la app no duplica avisos desde dentro (`notifyCheck`).
 
+## Resumen de correo
+
+1. La tarea programada de Claude «Correo Mi día» (7:18 y 19:18, hora de Madrid) lee Gmail, clasifica cada hilo en `p` 2 (importante), 1 (para leer) o 0 (puede esperar) y escribe `{ email, items: [{ p, from, subject, summary, thread }] }`.
+2. Lo cifra con `notify/cifrar.mjs` y `notify/correo-publica.pem` (RSA-OAEP + AES-256-GCM): el repositorio es público y el input del workflow se ve.
+3. Lanza `correo.yml` con el input `datos`. `notify/correo.mjs` descifra con la clave privada de `FIREBASE_SERVICE_ACCOUNT`, busca el usuario por email, guarda `users/{uid}.mail = { at, items }` y manda un aviso.
+4. La app lo recibe en `sync.js` (`hooks.mail`), lo guarda en `midia.mail` y lo pinta en Inicio (`mailHtml()`). Clases `m0`-`m2`, no `p2` (ya existe para prioridad).
+
+Si cambia la cuenta de servicio, vuelve a sacar la clave pública lanzando `correo.yml` sin datos y sustituye `notify/correo-publica.pem`.
+
 ## Estado y pendiente
 
 Hecho y publicado: todo lo de la tabla de arriba.
@@ -74,5 +84,7 @@ Pendiente de comprobar (a 28 oct 2026). Los workflows ya usan Node 24 (checkout@
 - ~~Workflow Avisos~~: funciona (secreto correcto, cron activo) y el móvil del usuario está registrado (28 oct 2026). Falta que confirme que le llega un aviso con la app cerrada.
 - ~~Despliegue automático~~: funciona desde el 28 oct 2026 (a la cuenta de servicio le faltaba el rol «Consumidor de Service Usage», ya añadido).
 - Avisos push y Google Calendar con la cuenta real del usuario en su móvil (necesitan que active la API de Google Calendar en Google Cloud, enlace en Ajustes).
+
+- La tarea programada «Correo Mi día» necesita que el usuario le añada el conector de Gmail desde claude.ai (creada sin conectores). El recorrido completo se probó a mano el 28 oct 2026 y funciona.
 
 Ideas que el usuario ha visto y aún no ha pedido: widget real de iOS (no es posible en una PWA; se usa un atajo de la app Atajos).
