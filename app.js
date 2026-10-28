@@ -111,7 +111,7 @@ function row(it, tt) {
   if (it.type === 'study' || it.type === 'review') return studyRow(it, tt);
   if (it.type === 'class') {
     return `<li class="row${tt === null ? ' notime' : ''}">
-      ${tt === null ? '' : `<span class="time">${tt}</span>`}<span class="lead" style="color:var(--t${tagSlot(it.title)})">${icon('class')}</span>
+      ${tt === null ? '' : `<span class="time">${tt}</span>`}<span class="lead" style="color:var(--t${clsSlot(it.title)})">${icon('class')}</span>
       <button type="button" class="body" data-act="clsedit" data-id="${it.cls.id}"><span class="title">${esc(it.title)}</span><span class="meta">${['Clase', it.end && `hasta las ${it.end}`, it.place && esc(it.place)].filter(Boolean).join(' · ')}</span></button>
     </li>`;
   }
@@ -677,8 +677,11 @@ const WD_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const WD_SHORT = { 1: 'L', 2: 'M', 3: 'X', 4: 'J', 5: 'V', 6: 'S', 0: 'D' };
 const WD_NAME = { 1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado', 0: 'Domingo' };
 const activeClasses = () => live(state.classes).filter((c) => !c.until || c.until >= today());
+const subjects = () => [...new Set(activeClasses().map((c) => c.name))];
+// Color por asignatura: distinto para cada una (hasta 8) en vez de depender del nombre.
+const clsSlot = (name) => { const i = [...new Set(live(state.classes).map((c) => c.name))].sort((a, b) => a.localeCompare(b, 'es')).indexOf(name); return i < 0 ? tagSlot(name) : i % 8; };
 function classSummary() {
-  const n = activeClasses().length;
+  const n = subjects().length;
   const next = classesOn(state.classes, today()).filter((c) => c.end > nowHM()).sort(sortDay)[0];
   return next ? `${next.time < nowHM() ? 'Ahora' : `A las ${next.time}`}: ${next.title}` : n ? plural(n, ['asignatura', 'asignaturas']) : 'Añade tus clases';
 }
@@ -697,13 +700,13 @@ function viewHorario() {
     const cs = all.filter((c) => c.days?.includes(d)).sort((a, b) => a.start.localeCompare(b.start));
     html += `<h2 class="sec${d === wd ? ' cls-today' : ''}">${WD_NAME[d]}${d === wd ? ' · hoy' : ''}</h2>`;
     html += cs.length ? `<ul class="group">${cs.map((c) => `<li class="row${c.until && c.until < t ? ' done' : ''}">
-      <span class="time">${c.start}</span><span class="lead" style="color:var(--t${tagSlot(c.name)})">${icon('class')}</span>
+      <span class="time">${c.start}</span><span class="lead" style="color:var(--t${clsSlot(c.name)})">${icon('class')}</span>
       <button type="button" class="body" data-act="clsedit" data-id="${c.id}"><span class="title">${esc(c.name)}</span>
       <span class="meta">${[`${c.start}–${c.end}`, c.place && esc(c.place), c.until && (c.until < t ? 'Terminada' : `Hasta el ${fShort(c.until)}`)].filter(Boolean).join(' · ')}</span></button></li>`).join('')}</ul>`
       : '<p class="free">Sin clases</p>';
   }
   html += `<button type="button" class="btn lib-add" data-act="clsnew">${icon('plus')}Añadir clase</button>`;
-  const n = activeClasses().length;
+  const n = subjects().length;
   return { title: 'Horario', sub: n ? `${plural(n, ['asignatura', 'asignaturas'])} · ${plural(todays.length, ['clase', 'clases'])} hoy` : 'Tus clases de la semana', html };
 }
 
