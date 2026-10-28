@@ -1,4 +1,4 @@
-const CACHE = 'midia-v13';
+const CACHE = 'midia-v14';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'sync.js', 'dates.js', 'quick.js', 'firebase-config.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -41,7 +41,7 @@ self.addEventListener('push', (e) => {
   let p = {};
   try { p = e.data ? e.data.json() : {}; } catch {}
   const n = p.notification || p.data || {};
-  e.waitUntil(self.registration.showNotification(n.title || 'Mi día', {
+  e.waitUntil(self.registration.showNotification(n.title || 'Séneca', {
     body: n.body || '',
     icon: 'icons/icon-192.png',
     badge: 'icons/icon-192.png',

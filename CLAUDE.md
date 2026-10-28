@@ -1,10 +1,11 @@
-# Mi día
+# Séneca (antes «Mi día»)
 
 Dashboard personal de organización diaria (tareas, citas, exámenes, estudio, hábitos, contadores, biblioteca de libros y juegos, cartera de ingresos y gastos, horario de clases). Es una PWA en español que se usa en móvil y ordenador.
 
 - Web publicada: https://mi-dia-467b1.web.app
 - Repositorio: https://github.com/gonzaloysasi3-web/mi-dia
 - Proyecto Firebase: `mi-dia-467b1` (plan gratuito Spark)
+- La app se llama **Séneca** (título, manifest, cabecera y avisos). El repositorio y el proyecto siguen como `mi-dia`.
 - El usuario escribe en español y quiere respuestas en español.
 
 ## Cómo está hecho

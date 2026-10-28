@@ -1,6 +1,6 @@
 {
-  "name": "Mi día",
-  "short_name": "Mi día",
+  "name": "Séneca",
+  "short_name": "Séneca",
   "description": "Tareas, citas, exámenes y hábitos del día.",
   "lang": "es",
   "start_url": "./",

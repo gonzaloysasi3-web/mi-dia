@@ -1223,7 +1223,7 @@ function render() {
   $('#view').innerHTML = v.html;
   $('#main').classList.toggle('wide', view === 'inicio');
   hideTip();
-  document.title = v.title === 'Inicio' ? 'Mi día' : `${v.title} · Mi día`;
+  document.title = v.title === 'Inicio' ? 'Séneca' : `${v.title} · Séneca`;
   document.querySelectorAll('.nav button').forEach((b) => {
     const on = b.dataset.view === view || (b.dataset.view === 'mas' && MORE_VIEWS.includes(view));
     if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
