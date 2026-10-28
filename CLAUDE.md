@@ -1,6 +1,6 @@
 # Mi día
 
-Dashboard personal de organización diaria (tareas, citas, exámenes, estudio, hábitos, contadores, biblioteca de libros y juegos). Es una PWA en español que se usa en móvil y ordenador.
+Dashboard personal de organización diaria (tareas, citas, exámenes, estudio, hábitos, contadores, biblioteca de libros y juegos, cartera de ingresos y gastos). Es una PWA en español que se usa en móvil y ordenador.
 
 - Web publicada: https://mi-dia-467b1.web.app
 - Repositorio: https://github.com/gonzaloysasi3-web/mi-dia
@@ -27,19 +27,20 @@ HTML, CSS y JavaScript sin framework ni compilación. Los módulos ES se cargan 
 
 ### Vistas
 
-`inicio`, `hoy`, `semana`, `examenes`, `habitos`, `biblioteca`, `contadores`, `revision`, `ajustes`, `mas`. Cada una es una función `viewX()` en `app.js` que devuelve `{ title, sub, html }`; `render()` pinta la actual. Las acciones van por delegación de eventos con `data-act` en `#view`.
+`inicio`, `hoy`, `semana`, `examenes`, `habitos`, `biblioteca`, `cartera`, `contadores`, `revision`, `ajustes`, `mas`. Cada una es una función `viewX()` en `app.js` que devuelve `{ title, sub, html }`; `render()` pinta la actual. Las acciones van por delegación de eventos con `data-act` en `#view`.
 
 En móvil la barra inferior muestra Inicio, Hoy, Semana, Exámenes y Más; el resto (`.nav-extra`) va dentro de Más. En escritorio (≥ 880 px) todo está en la barra lateral.
 
 ### Datos
 
-Estado local en `localStorage` (`midia.v1`) con cinco listas: `items`, `habits`, `focus`, `counters`, `library`. Cada elemento tiene `id` y `u` (marca de tiempo). Los borrados se marcan con `del: true` y se purgan a los 30 días. Al sincronizar se fusiona por elemento y gana el `u` más reciente.
+Estado local en `localStorage` (`midia.v1`) con seis listas: `items`, `habits`, `focus`, `counters`, `library`, `wallet`. Cada elemento tiene `id` y `u` (marca de tiempo). Los borrados se marcan con `del: true` y se purgan a los 30 días. Al sincronizar se fusiona por elemento y gana el `u` más reciente.
 
 - `items`: `type` (`task` | `event` | `exam`), `title`, `date`, `time`, `place`, `prio` (0-2), `done`, `tags[]`, `repeat` (`{ f: 'day'|'weekdays'|'week'|'month', n, days[] }`), `doneOn{fecha:1}` para repetidas, `subs[]` (subtareas o temas de examen, con `done` y `doneAt`).
 - Elementos virtuales que no se guardan: `study` y `review` (plan de estudio que reparte los temas de cada examen) y `gcal` (eventos de Google Calendar, en caché en `midia.gcal`).
 - `focus`: registros de Pomodoro `{ ref, label, date, min }`.
 - `counters`: `{ name, unit, step, goal, log{fecha:cantidad} }`.
 - `library`: `{ kind: 'book'|'game', title, by, status: 'now'|'todo'|'done'|'dropped', total, cur, hours, pct, rating, notes, start, end }`.
+- `wallet`: movimientos `{ kind: 'in'|'out', amount, title, cat, date, monthly }`. Los `monthly` se repiten cada mes desde su fecha (mismo día o el último del mes), ver `walletMonth()`. Mismo formato que el artefacto Wallet, del que se importaron los datos (Cartera → Importar movimientos acepta su JSON). En Inicio sale un gráfico circular de ingresos (`--c-in`, azul) contra gastos (`--c-out`, naranja): no se usa verde/rojo por daltonismo.
 
 En Firestore todo va en el documento `users/{uid}`: el campo `state` (JSON del estado) y el mapa `push` (`tokens` por dispositivo con su zona horaria, y `sent` para no repetir avisos). Escribe siempre con `{ merge: true }` para no borrar `push`. Si añades una lista nueva, añádela también a `LISTS` en `app.js` y en `sync.js`.
 

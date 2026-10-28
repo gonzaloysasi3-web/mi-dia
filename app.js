@@ -20,7 +20,7 @@ const mondayOf = (s) => addDays(s, -((parse(s).getDay() + 6) % 7));
 
 /* ---------- Estado (local primero; la sincronización es opcional) ---------- */
 const uid = () => crypto.randomUUID?.() ?? Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-const LISTS = ['items', 'habits', 'focus', 'counters', 'library'];
+const LISTS = ['items', 'habits', 'focus', 'counters', 'library', 'wallet'];
 const empty = () => Object.fromEntries(LISTS.map((k) => [k, []]));
 
 function load() {
@@ -427,6 +427,10 @@ function viewInicio() {
           : `<div class="group empty"><p>Añade lo que estás leyendo o jugando.</p><button type="button" class="text-btn" data-act="go" data-view="biblioteca">Ir a la biblioteca</button></div>`}
       </section>
     </div><div class="dash-col">
+      <section class="p-wallet" aria-labelledby="h-wallet"><h2 class="sec" id="h-wallet">Cartera, ${fMonth(t.slice(0, 7))}</h2>
+        ${live(state.wallet).length ? `<button type="button" class="group chart w-link" data-act="go" data-view="cartera" aria-label="Abrir Cartera">${walletDonut(t.slice(0, 7))}</button>`
+          : `<div class="group empty"><p>Apunta tus ingresos y gastos para ver el mes de un vistazo.</p><button type="button" class="text-btn" data-act="go" data-view="cartera">Ir a Cartera</button></div>`}
+      </section>
       <section class="p-cal" aria-labelledby="h-cal"><h2 class="sec" id="h-cal">Calendario</h2>${calendarHtml(items)}</section>
       <section class="p-hab" aria-labelledby="h-hab"><h2 class="sec" id="h-hab">Hábitos, últimos 30 días</h2>${habitsChart(habits)}</section>
       <section class="p-focus" aria-labelledby="h-focus"><h2 class="sec" id="h-focus">Estudio, últimos 7 días</h2>${focusChart()}</section>
@@ -659,6 +663,163 @@ function addCounter(e) {
   commit();
 }
 
+/* ---------- Cartera: ingresos y gastos ---------- */
+const WCATS = {
+  in: ['Nómina', 'Cobro', 'Bizum', 'Reembolso', 'Otros'],
+  out: ['Alquiler', 'Comida', 'Transporte', 'Ocio', 'Suscripciones', 'Salud', 'Compras', 'Facturas', 'Otros'],
+};
+let walMonth = today().slice(0, 7);
+const eur = (n) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: n % 1 ? 2 : 0 }).format(n);
+const r2 = (n) => Math.round(n * 100) / 100;
+
+// Movimientos de un mes (AAAA-MM). Los mensuales se repiten desde su mes de inicio, el mismo día (o el último del mes).
+function walletMonth(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate();
+  const out = [];
+  for (const x of live(state.wallet)) {
+    if (x.monthly) {
+      if (x.date.slice(0, 7) <= ym) out.push({ ...x, day: `${ym}-${pad(Math.min(Number(x.date.slice(8, 10)), last))}` });
+    } else if (x.date.slice(0, 7) === ym) out.push({ ...x, day: x.date });
+  }
+  return out.sort((a, b) => b.day.localeCompare(a.day) || b.u - a.u);
+}
+function walletTotals(ym) {
+  const xs = walletMonth(ym);
+  const sum = (k) => r2(xs.filter((x) => x.kind === k).reduce((s, x) => s + x.amount, 0));
+  const inc = sum('in'), exp = sum('out');
+  return { xs, inc, exp, bal: r2(inc - exp) };
+}
+
+// Gráfico circular: ingresos contra gastos, con el saldo en el centro.
+function walletDonut(ym) {
+  const { inc, exp, bal } = walletTotals(ym);
+  const tot = inc + exp;
+  const a = tot ? (inc / tot) * 100 : 0;
+  const seg = (cls, len, off) => (len > 0 ? `<circle class="${cls}" cx="21" cy="21" r="15.915" pathLength="100" stroke-dasharray="${len} ${100 - len}" stroke-dashoffset="${-off}"/>` : '');
+  return `<div class="w-sum">
+    <svg class="donut" viewBox="0 0 42 42" role="img" aria-label="Ingresos ${eur(inc)}, gastos ${eur(exp)}, saldo ${eur(bal)}">
+      <circle class="d-track" cx="21" cy="21" r="15.915"/>${seg('d-in', a, 0)}${seg('d-out', tot ? 100 - a : 0, a)}
+      <text x="21" y="20" class="d-lbl">Saldo</text><text x="21" y="25.5" class="d-val">${eur(bal)}</text>
+    </svg>
+    <dl class="w-legend">
+      <div><dt><i class="w-dot in"></i>Ingresos</dt><dd>${eur(inc)}</dd></div>
+      <div><dt><i class="w-dot out"></i>Gastos</dt><dd>${eur(exp)}</dd></div>
+      <div class="w-bal"><dt>Saldo</dt><dd class="${bal < 0 ? 'neg' : ''}">${eur(bal)}</dd></div>
+    </dl>
+  </div>`;
+}
+function walletSummary() {
+  const { inc, exp, bal } = walletTotals(today().slice(0, 7));
+  return inc || exp ? `Saldo del mes ${eur(bal)}` : 'Ingresos y gastos';
+}
+
+function walletRow(x) {
+  const sign = x.kind === 'in' ? '+' : '−';
+  const meta = [cap(fShort(x.day)), esc(x.cat), x.monthly ? 'Cada mes' : ''].filter(Boolean).join(' · ');
+  return `<li class="row notime"><span class="lead w-${x.kind}">${icon(x.kind === 'in' ? 'plus' : 'minus')}</span>
+    <button type="button" class="body" data-act="walledit" data-id="${x.id}"><span class="title">${esc(x.title || x.cat)}</span><span class="meta">${meta}</span></button>
+    <b class="w-amt ${x.kind}">${sign}${eur(x.amount)}</b></li>`;
+}
+
+function viewCartera() {
+  const { xs, inc, exp } = walletTotals(walMonth);
+  const cats = {};
+  for (const x of xs) if (x.kind === 'out') cats[x.cat] = r2((cats[x.cat] || 0) + x.amount);
+  const top = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+  let html = `<div class="w-month">
+    <button type="button" class="icon-btn" data-act="walmonth" data-d="-1" aria-label="Mes anterior">${icon('prev')}</button>
+    <h2>${cap(fMonth(walMonth))}</h2>
+    <button type="button" class="icon-btn" data-act="walmonth" data-d="1" aria-label="Mes siguiente">${icon('next')}</button>
+    ${walMonth !== today().slice(0, 7) ? `<button type="button" class="text-btn" data-act="walmonth" data-d="0">Este mes</button>` : ''}
+  </div>
+  <div class="group chart">${walletDonut(walMonth)}</div>`;
+  if (top.length) html += `<h2 class="sec">Gastos por categoría</h2><div class="group chart">${top.map(([c, v]) => `
+    <div class="hbar wide-val" tabindex="0" aria-label="${esc(c)}: ${eur(v)}">
+      <span class="hname">${esc(c)}</span><span class="track"><span class="fill w-fill" style="width:${Math.round((v / top[0][1]) * 100)}%"></span></span><span class="hpct">${eur(v)}</span></div>`).join('')}</div>`;
+  html += `<h2 class="sec">Movimientos</h2>` + (xs.length ? `<ul class="group">${xs.map(walletRow).join('')}</ul>`
+    : `<div class="group empty"><p>No hay movimientos este mes.</p></div>`);
+  html += `<button type="button" class="btn lib-add" data-act="walnew">${icon('plus')}Añadir movimiento</button>
+  <details class="past w-import"><summary>Importar movimientos</summary>
+    <form class="group c-form" data-form="walimport">
+      <label class="field"><span>Pega aquí el texto exportado de Wallet o elige el archivo</span>
+        <textarea name="json" rows="4" placeholder='[{"kind":"out","amount":12,"title":"Sushi","cat":"Comida","date":"2026-10-16"}]'></textarea></label>
+      <input type="file" name="file" accept=".json,application/json" aria-label="Archivo de movimientos">
+      <button type="submit" class="btn">Importar</button>
+    </form>
+  </details>`;
+  return { title: 'Cartera', sub: inc || exp ? `${eur(inc)} de ingresos · ${eur(exp)} de gastos` : cap(fMonth(walMonth)), html };
+}
+
+// Importa movimientos con el formato de Wallet. Los que ya existen (mismo id) se actualizan, no se duplican.
+function importWallet(list) {
+  if (!Array.isArray(list)) throw new Error('formato');
+  let n = 0;
+  for (const e of list) {
+    const amount = Number(e?.amount);
+    if (!['in', 'out'].includes(e?.kind) || !(amount > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(e?.date)) continue;
+    upsert(state.wallet, {
+      id: typeof e.id === 'string' && e.id ? e.id : uid(), kind: e.kind, amount: r2(amount),
+      title: String(e.title || '').slice(0, 120), cat: String(e.cat || 'Otros').slice(0, 40), date: e.date, monthly: !!e.monthly,
+    });
+    n++;
+  }
+  return n;
+}
+async function onWalletImport(e) {
+  e.preventDefault();
+  const f = e.target;
+  const file = f.file.files[0];
+  try {
+    const n = importWallet(JSON.parse(file ? await file.text() : f.json.value));
+    if (!n) return toast('No había movimientos válidos para importar.');
+    walMonth = today().slice(0, 7);
+    commit();
+    toast(`${plural(n, ['movimiento importado', 'movimientos importados'])}.`);
+  } catch { toast('No se pudo leer. Comprueba que el texto está completo.'); }
+}
+
+const walDlg = $('#walSheet');
+const walForm = $('#walForm');
+let walEditing = null;
+function walCats(kind, sel) {
+  walForm.cat.innerHTML = WCATS[kind].map((c) => `<option>${esc(c)}</option>`).join('');
+  walForm.cat.value = WCATS[kind].includes(sel) ? sel : WCATS[kind][0];
+}
+function openWallet(x) {
+  walEditing = x;
+  walForm.reset();
+  const kind = x?.kind || 'out';
+  $('#walTitle').textContent = x ? 'Editar movimiento' : 'Nuevo movimiento';
+  walForm.kind.value = kind;
+  walCats(kind, x?.cat);
+  walForm.amount.value = x ? String(x.amount).replace('.', ',') : '';
+  walForm.title.value = x?.title || '';
+  walForm.date.value = x?.date || (walMonth === today().slice(0, 7) ? today() : `${walMonth}-01`);
+  walForm.monthly.checked = !!x?.monthly;
+  $('#walDel').hidden = !x;
+  walDlg.showModal();
+  if (!x) walForm.amount.focus();
+}
+walForm.addEventListener('change', (e) => { if (e.target.name === 'kind') walCats(e.target.value); });
+walForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = new FormData(walForm);
+  const amount = r2(parseFloat(String(f.get('amount')).replace(',', '.')));
+  if (!(amount > 0)) { walForm.amount.focus(); return toast('Escribe un importe mayor que 0.'); }
+  const x = walEditing ? { ...walEditing } : { id: uid() };
+  Object.assign(x, { kind: f.get('kind'), amount, title: String(f.get('title')).trim(), cat: f.get('cat'), date: f.get('date') || today(), monthly: f.get('monthly') === 'on' });
+  upsert(state.wallet, x);
+  walDlg.close();
+  commit();
+});
+$('#walDel').addEventListener('click', () => {
+  const x = state.wallet.find((y) => y.id === walEditing.id);
+  walDlg.close();
+  remove(state.wallet, x, 'Movimiento eliminado');
+});
+walDlg.addEventListener('click', (e) => { if (e.target === walDlg || e.target.closest('[data-close]')) walDlg.close(); });
+
 /* ---------- Revisión semanal ---------- */
 const overdueTasks = () => live(state.items).filter((i) => i.type === 'task' && !i.repeat && !i.done && i.date < today()).sort((a, b) => a.date.localeCompare(b.date));
 function viewRevision() {
@@ -759,7 +920,7 @@ function viewAjustes() {
 }
 
 /* ---------- Más ---------- */
-const MORE_VIEWS = ['habitos', 'biblioteca', 'contadores', 'revision', 'ajustes', 'mas'];
+const MORE_VIEWS = ['habitos', 'biblioteca', 'cartera', 'contadores', 'revision', 'ajustes', 'mas'];
 function navRow(v, ic, name, sum) {
   return `<li class="row notime"><span class="lead">${icon(ic)}</span>
     <button type="button" class="body" data-act="go" data-view="${v}"><span class="title">${name}</span>${sum ? `<span class="meta">${sum}</span>` : ''}</button>
@@ -770,6 +931,7 @@ function viewMas() {
   const html = `<ul class="group">
     ${navRow('habitos', 'habitos', 'Hábitos', habits.length ? `${habits.filter((h) => h.log[today()]).length} de ${habits.length} hoy` : 'Sin hábitos')}
     ${navRow('biblioteca', 'library', 'Biblioteca', libSummary())}
+    ${navRow('cartera', 'wallet', 'Cartera', walletSummary())}
     ${navRow('contadores', 'counter', 'Contadores', plural(live(state.counters).length, ['contador', 'contadores']))}
     ${navRow('revision', 'review', 'Revisión semanal', 'Lo que pasó y lo que viene')}
     ${navRow('ajustes', 'settings', 'Ajustes', 'Avisos, Google Calendar y atajos')}
@@ -779,7 +941,7 @@ function viewMas() {
 
 const views = {
   inicio: viewInicio, hoy: viewHoy, semana: viewSemana, examenes: viewExamenes, habitos: viewHabitos,
-  biblioteca: viewBiblioteca, contadores: viewContadores, revision: viewRevision, ajustes: viewAjustes, mas: viewMas,
+  biblioteca: viewBiblioteca, cartera: viewCartera, contadores: viewContadores, revision: viewRevision, ajustes: viewAjustes, mas: viewMas,
 };
 
 /* ---------- Avisos (mientras la app está abierta) ---------- */
@@ -1210,6 +1372,13 @@ $('#view').addEventListener('click', (e) => {
   if (act === 'go') setView(b.dataset.view);
   else if (act === 'libtab') { libTab = b.dataset.tab; setPref('libTab', libTab); render(); }
   else if (act === 'libnew') openLib(null);
+  else if (act === 'walnew') openWallet(null);
+  else if (act === 'walledit') openWallet(state.wallet.find((x) => x.id === id));
+  else if (act === 'walmonth') {
+    if (b.dataset.d === '0') walMonth = today().slice(0, 7);
+    else { const [y, m] = walMonth.split('-').map(Number); walMonth = ymd(new Date(y, m - 1 + Number(b.dataset.d), 1)).slice(0, 7); }
+    render();
+  }
   else if (act === 'libedit') openLib(state.library.find((x) => x.id === id));
   else if (act === 'libplus') {
     const x = state.library.find((y) => y.id === id);
@@ -1287,6 +1456,7 @@ $('#view').addEventListener('click', (e) => {
 
 $('#view').addEventListener('submit', (e) => {
   if (e.target.dataset.form === 'counter') return addCounter(e);
+  if (e.target.dataset.form === 'walimport') return onWalletImport(e);
   if (e.target.dataset.form !== 'habit') return;
   e.preventDefault();
   const name = e.target.name.value.trim();

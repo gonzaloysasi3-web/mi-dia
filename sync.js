@@ -11,7 +11,7 @@ const stable = (v) => Array.isArray(v) ? v.map(stable)
   : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, stable(v[k])]))
   : v;
 const byId = (a, b) => (a.id < b.id ? -1 : 1);
-const LISTS = ['items', 'habits', 'focus', 'counters', 'library'];
+const LISTS = ['items', 'habits', 'focus', 'counters', 'library', 'wallet'];
 const canon = (s) => JSON.stringify(stable(Object.fromEntries(LISTS.map((k) => [k, [...(s[k] || [])].sort(byId)]))));
 
 export async function start(h) {
