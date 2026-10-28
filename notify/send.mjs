@@ -14,10 +14,12 @@ const DEAD = new Set(['messaging/registration-token-not-registered', 'messaging/
 
 const users = await db.collection('users').get();
 let total = 0;
+let devices = 0;
 for (const doc of users.docs) {
   const data = doc.data();
   const tokens = Object.entries(data.push?.tokens || {});
   if (!tokens.length || !data.state) continue;
+  devices += tokens.length;
 
   const tz = tokens[0][1].tz || 'Europe/Madrid';
   const state = JSON.parse(data.state);
@@ -41,4 +43,4 @@ for (const doc of users.docs) {
   for (const t of dead) args.push(new admin.firestore.FieldPath('push', 'tokens', t), admin.firestore.FieldValue.delete());
   if (notes.length || dead.size) await doc.ref.update(...args);
 }
-console.log(`Avisos enviados: ${total}`);
+console.log(`Dispositivos con avisos activados: ${devices} · Avisos enviados: ${total}`);
