@@ -426,7 +426,7 @@ function viewInicio() {
         ${next.length ? `<ul class="group">${next.map((i) => row(i, i.time || '')).join('')}</ul>`
           : `<div class="group empty"><p>${todays.length ? 'Nada más por hoy.' : 'Nada planeado para hoy.'}</p><button type="button" class="btn" data-act="add">${icon('plus')}Añadir</button></div>`}
       </section>
-      <section class="p-mail" aria-labelledby="h-mail"><h2 class="sec" id="h-mail">Correo</h2>${mailHtml()}</section>
+      ${MAIL ? `<section class="p-mail" aria-labelledby="h-mail"><h2 class="sec" id="h-mail">Correo</h2>${mailHtml()}</section>` : ''}
       <section class="p-exam" aria-labelledby="h-exam"><h2 class="sec" id="h-exam">Próximos exámenes</h2>
         ${exams.length ? `<ul class="group">${exams.slice(0, 4).map(examRow).join('')}</ul>` : '<p class="free">No hay exámenes próximos.</p>'}
       </section>
@@ -924,7 +924,6 @@ function mailRow(x) {
     <span class="mail-tag">${MAIL_P[x.p]}</span></li>`;
 }
 function mailHtml() {
-  if (!MAIL) return '<div class="group empty"><p>Tu resumen de correo llegará a las 7:30 y a las 19:30.</p></div>';
   const when = new Intl.DateTimeFormat('es-ES', { weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(MAIL.at);
   if (!MAIL.items.length) return `<div class="group empty"><p>Sin correos nuevos (${esc(when)}).</p></div>`;
   const top = MAIL.items.filter((x) => x.p === 2), rest = MAIL.items.filter((x) => x.p !== 2);
