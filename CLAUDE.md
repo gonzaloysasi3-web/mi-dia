@@ -71,7 +71,7 @@ Al subir a `main`, el workflow `publicar.yml` despliega en Firebase Hosting usan
 Hecho y publicado: todo lo de la tabla de arriba.
 
 Pendiente de comprobar (a 28 oct 2026). Los workflows ya usan Node 24 (checkout@v5, setup-node@v5):
-- Que el secreto `FIREBASE_SERVICE_ACCOUNT` está guardado en GitHub y que el workflow **Avisos** corre bien (Actions → Avisos → Run workflow).
+- ~~Workflow Avisos~~: funciona (secreto correcto, cron activo) y el móvil del usuario está registrado (28 oct 2026). Falta que confirme que le llega un aviso con la app cerrada.
 - ~~Despliegue automático~~: funciona desde el 28 oct 2026 (a la cuenta de servicio le faltaba el rol «Consumidor de Service Usage», ya añadido).
 - Avisos push y Google Calendar con la cuenta real del usuario en su móvil (necesitan que active la API de Google Calendar en Google Cloud, enlace en Ajustes).
 
