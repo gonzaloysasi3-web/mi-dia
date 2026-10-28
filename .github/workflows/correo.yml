@@ -1,0 +1,30 @@
+name: Correo
+
+# Lo lanza la tarea programada de Claude con el resumen de Gmail cifrado.
+# Sin datos, imprime la clave pública con la que se cifra.
+on:
+  workflow_dispatch:
+    inputs:
+      datos:
+        description: Resumen cifrado (vacío para ver la clave pública)
+        required: false
+        default: ''
+
+concurrency:
+  group: correo
+  cancel-in-progress: false
+
+jobs:
+  guardar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm install --prefix notify --no-audit --no-fund
+      - run: node notify/correo.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          DATOS: ${{ inputs.datos }}

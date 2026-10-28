@@ -41,6 +41,7 @@ function listen(u) {
   const ref = fb.doc(db, 'users', u.uid);
   unsub = fb.onSnapshot(ref, (snap) => {
     const remote = snap.exists() && snap.data().state ? JSON.parse(snap.data().state) : null;
+    if (snap.exists()) hooks.mail?.(snap.data().mail || null);
     const merged = hooks.merge(remote);
     if (!remote || canon(merged) !== canon(remote)) push(merged);
   }, () => hooks.onStatus({ state: 'error' }));

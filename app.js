@@ -418,6 +418,7 @@ function viewInicio() {
         ${next.length ? `<ul class="group">${next.map((i) => row(i, i.time || '')).join('')}</ul>`
           : `<div class="group empty"><p>${todays.length ? 'Nada más por hoy.' : 'Nada planeado para hoy.'}</p><button type="button" class="btn" data-act="add">${icon('plus')}Añadir</button></div>`}
       </section>
+      <section class="p-mail" aria-labelledby="h-mail"><h2 class="sec" id="h-mail">Correo</h2>${mailHtml()}</section>
       <section class="p-exam" aria-labelledby="h-exam"><h2 class="sec" id="h-exam">Próximos exámenes</h2>
         ${exams.length ? `<ul class="group">${exams.slice(0, 4).map(examRow).join('')}</ul>` : '<p class="free">No hay exámenes próximos.</p>'}
       </section>
@@ -819,6 +820,32 @@ $('#walDel').addEventListener('click', () => {
   remove(state.wallet, x, 'Movimiento eliminado');
 });
 walDlg.addEventListener('click', (e) => { if (e.target === walDlg || e.target.closest('[data-close]')) walDlg.close(); });
+
+/* ---------- Resumen de correo (lo prepara una tarea programada de Claude a las 7:30 y a las 19:30) ---------- */
+const MAIL_P = { 2: 'Importante', 1: 'Para leer', 0: 'Puede esperar' };
+let MAIL = readJSON('midia.mail', null);
+function setMail(m) {
+  if (JSON.stringify(m) === JSON.stringify(MAIL)) return;
+  MAIL = m;
+  writeJSON('midia.mail', m);
+  if (view === 'inicio') render();
+}
+function mailRow(x) {
+  const body = `<span class="title">${esc(x.subject || '(sin asunto)')}</span>
+    <span class="meta">${esc(x.from)}${x.summary ? ` · ${esc(x.summary)}` : ''}</span>`;
+  return `<li class="row notime mail-row m${x.p}"><span class="lead"><i class="mail-dot" aria-hidden="true"></i></span>
+    ${x.thread ? `<a class="body" href="https://mail.google.com/mail/u/0/#all/${esc(x.thread)}" target="_blank" rel="noopener">${body}</a>` : `<div class="body">${body}</div>`}
+    <span class="mail-tag">${MAIL_P[x.p]}</span></li>`;
+}
+function mailHtml() {
+  if (!MAIL) return '<div class="group empty"><p>Tu resumen de correo llegará a las 7:30 y a las 19:30.</p></div>';
+  const when = new Intl.DateTimeFormat('es-ES', { weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(MAIL.at);
+  if (!MAIL.items.length) return `<div class="group empty"><p>Sin correos nuevos (${esc(when)}).</p></div>`;
+  const top = MAIL.items.filter((x) => x.p === 2), rest = MAIL.items.filter((x) => x.p !== 2);
+  return `<p class="mail-when">Preparado el ${esc(when)}</p>
+    ${top.length ? `<ul class="group">${top.map(mailRow).join('')}</ul>` : '<p class="free">Nada importante.</p>'}
+    ${rest.length ? `<details class="past mail-more"><summary>${plural(rest.length, ['correo más', 'correos más'])}</summary><ul class="group">${rest.map(mailRow).join('')}</ul></details>` : ''}`;
+}
 
 /* ---------- Revisión semanal ---------- */
 const overdueTasks = () => live(state.items).filter((i) => i.type === 'task' && !i.repeat && !i.done && i.date < today()).sort((a, b) => a.date.localeCompare(b.date));
@@ -1503,6 +1530,7 @@ if (qs.has('add')) openSheet(null);
 if (location.search) history.replaceState(null, '', location.pathname);
 sync.start({
   merge: mergeRemote,
+  mail: setMail,
   onStatus: (s) => {
     syncInfo = s;
     paintSync();

@@ -1,4 +1,4 @@
-const CACHE = 'midia-v9';
+const CACHE = 'midia-v10';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'sync.js', 'dates.js', 'quick.js', 'firebase-config.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -32,7 +32,7 @@ self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
     const open = list.find((c) => c.url.startsWith(self.registration.scope));
-    return open ? open.focus() : self.clients.openWindow('./?v=hoy');
+    return open ? open.focus() : self.clients.openWindow(e.notification.data?.url || './?v=hoy');
   }));
 });
 
@@ -46,5 +46,6 @@ self.addEventListener('push', (e) => {
     icon: 'icons/icon-192.png',
     badge: 'icons/icon-192.png',
     tag: n.tag || undefined,
+    data: { url: n.url || './?v=hoy' },
   }));
 });
