@@ -69,9 +69,9 @@ Al subir a `main`, el workflow `publicar.yml` despliega en Firebase Hosting usan
 
 Hecho y publicado: todo lo de la tabla de arriba.
 
-Pendiente de comprobar (a 28 oct 2026):
+Pendiente de comprobar (a 28 oct 2026). Los workflows ya usan Node 24 (checkout@v5, setup-node@v5):
 - Que el secreto `FIREBASE_SERVICE_ACCOUNT` está guardado en GitHub y que el workflow **Avisos** corre bien (Actions → Avisos → Run workflow).
-- Que el despliegue automático funciona; si falla por permisos, la cuenta de servicio necesita el rol «Administrador de Firebase Hosting» en Google Cloud IAM.
+- Que el despliegue automático funciona. La primera ejecución falló con 403 en `serviceusage.services.get`: el secreto está bien y la cuenta ya puede desplegar en Hosting, pero le falta el rol «Consumidor de Service Usage» (`roles/serviceusage.serviceUsageConsumer`) en Google Cloud IAM.
 - Avisos push y Google Calendar con la cuenta real del usuario en su móvil (necesitan que active la API de Google Calendar en Google Cloud, enlace en Ajustes).
 
 Ideas que el usuario ha visto y aún no ha pedido: widget real de iOS (no es posible en una PWA; se usa un atajo de la app Atajos).
