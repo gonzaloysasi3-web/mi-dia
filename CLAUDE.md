@@ -72,7 +72,7 @@ Al subir a `main`, el workflow `publicar.yml` despliega en Firebase Hosting usan
 
 ## Resumen de correo
 
-1. La tarea programada de Claude «Correo Mi día» (7:18 y 19:18, hora de Madrid) lee Gmail, clasifica cada hilo en `p` 2 (importante), 1 (para leer) o 0 (puede esperar) y escribe `{ email, items: [{ p, from, subject, summary, thread }] }`.
+1. La tarea programada de Claude «Correo Mi día» (7:18 y 19:18, hora de Madrid) lee Gmail, clasifica cada hilo en `p` 2 (importante), 1 (para leer) o 0 (puede esperar) y escribe `{ email, items: [{ p, from, subject, summary, thread, uni }] }`. `uni: true` marca la universidad (us.es, Enseñanza Virtual…): `correo.mjs` la sube a `p` 2 y la ordena antes que el resto, y la app la muestra con birrete y la etiqueta «Universidad».
 2. Lo cifra con `notify/cifrar.mjs` y `notify/correo-publica.pem` (RSA-OAEP + AES-256-GCM): el repositorio es público y el input del workflow se ve.
 3. Lanza `correo.yml` con el input `datos`. `notify/correo.mjs` descifra con la clave privada de `FIREBASE_SERVICE_ACCOUNT`, busca el usuario por email, guarda `users/{uid}.mail = { at, items }` y manda un aviso.
 4. La app lo recibe en `sync.js` (`hooks.mail`), lo guarda en `midia.mail` y lo pinta en Inicio (`mailHtml()`). Clases `m0`-`m2`, no `p2` (ya existe para prioridad).

@@ -919,9 +919,9 @@ function setMail(m) {
 function mailRow(x) {
   const body = `<span class="title">${esc(x.subject || '(sin asunto)')}</span>
     <span class="meta">${esc(x.from)}${x.summary ? ` · ${esc(x.summary)}` : ''}</span>`;
-  return `<li class="row notime mail-row m${x.p}"><span class="lead"><i class="mail-dot" aria-hidden="true"></i></span>
+  return `<li class="row notime mail-row m${x.p}${x.uni ? ' uni' : ''}"><span class="lead">${x.uni ? icon('class') : '<i class="mail-dot" aria-hidden="true"></i>'}</span>
     ${x.thread ? `<a class="body" href="https://mail.google.com/mail/u/0/#all/${esc(x.thread)}" target="_blank" rel="noopener">${body}</a>` : `<div class="body">${body}</div>`}
-    <span class="mail-tag">${MAIL_P[x.p]}</span></li>`;
+    <span class="mail-tag">${x.uni ? 'Universidad' : MAIL_P[x.p]}</span></li>`;
 }
 function mailHtml() {
   const when = new Intl.DateTimeFormat('es-ES', { weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(MAIL.at);
