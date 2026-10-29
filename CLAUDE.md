@@ -88,6 +88,6 @@ Pendiente de comprobar (a 28 oct 2026). Los workflows ya usan Node 24 (checkout@
 - ~~Despliegue automático~~: funciona desde el 28 oct 2026 (a la cuenta de servicio le faltaba el rol «Consumidor de Service Usage», ya añadido).
 - Avisos push y Google Calendar con la cuenta real del usuario en su móvil (necesitan que active la API de Google Calendar en Google Cloud, enlace en Ajustes).
 
-- La tarea programada «Correo Séneca» necesita que el usuario le añada el conector de Gmail desde claude.ai (creada sin conectores). El recorrido completo se probó a mano el 28 oct 2026 y funciona.
+- ~~Resumen de correo automático~~: funciona desde el 29 oct 2026. La tarea «Correo Séneca» necesita el conector Gmail y el repositorio `gonzaloysasi3-web/mi-dia` asociados (ambos añadidos por el usuario en claude.ai).
 
 Ideas que el usuario ha visto y aún no ha pedido: widget real de iOS (no es posible en una PWA; se usa un atajo de la app Atajos).
