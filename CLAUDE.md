@@ -72,7 +72,7 @@ Al subir a `main`, el workflow `publicar.yml` despliega en Firebase Hosting usan
 
 ## Resumen de correo
 
-1. La tarea programada de Claude «Correo Mi día» (7:18 y 19:18, hora de Madrid) lee Gmail, clasifica cada hilo en `p` 2 (importante), 1 (para leer) o 0 (puede esperar) y escribe `{ email, items: [{ p, from, subject, summary, thread, uni }] }`. `uni: true` marca la universidad (us.es, Enseñanza Virtual…): `correo.mjs` la sube a `p` 2 y la ordena antes que el resto, y la app la muestra con birrete y la etiqueta «Universidad».
+1. La tarea programada de Claude «Correo Séneca» (7:18 y 19:18, hora de Madrid) lee Gmail, clasifica cada hilo en `p` 2 (importante), 1 (para leer) o 0 (puede esperar) y escribe `{ email, items: [{ p, from, subject, summary, thread, uni }] }`. `uni: true` marca la universidad (us.es, Enseñanza Virtual…): `correo.mjs` la sube a `p` 2 y la ordena antes que el resto, y la app la muestra con birrete y la etiqueta «Universidad».
 2. Lo cifra con `notify/cifrar.mjs` y `notify/correo-publica.pem` (RSA-OAEP + AES-256-GCM): el repositorio es público y el input del workflow se ve.
 3. Lanza `correo.yml` con el input `datos`. `notify/correo.mjs` descifra con la clave privada de `FIREBASE_SERVICE_ACCOUNT`, busca el usuario por email, guarda `users/{uid}.mail = { at, items }` y manda un aviso.
 4. La app lo recibe en `sync.js` (`hooks.mail`), lo guarda en `midia.mail` y lo pinta en Inicio (`mailHtml()`). Clases `m0`-`m2`, no `p2` (ya existe para prioridad).
@@ -88,6 +88,6 @@ Pendiente de comprobar (a 28 oct 2026). Los workflows ya usan Node 24 (checkout@
 - ~~Despliegue automático~~: funciona desde el 28 oct 2026 (a la cuenta de servicio le faltaba el rol «Consumidor de Service Usage», ya añadido).
 - Avisos push y Google Calendar con la cuenta real del usuario en su móvil (necesitan que active la API de Google Calendar en Google Cloud, enlace en Ajustes).
 
-- La tarea programada «Correo Mi día» necesita que el usuario le añada el conector de Gmail desde claude.ai (creada sin conectores). El recorrido completo se probó a mano el 28 oct 2026 y funciona.
+- La tarea programada «Correo Séneca» necesita que el usuario le añada el conector de Gmail desde claude.ai (creada sin conectores). El recorrido completo se probó a mano el 28 oct 2026 y funciona.
 
 Ideas que el usuario ha visto y aún no ha pedido: widget real de iOS (no es posible en una PWA; se usa un atajo de la app Atajos).
