@@ -1050,7 +1050,12 @@ function viewMas() {
     ${navRow('contadores', 'counter', 'Contadores', plural(live(state.counters).length, ['contador', 'contadores']))}
     ${navRow('revision', 'review', 'Revisión semanal', 'Lo que pasó y lo que viene')}
     ${navRow('ajustes', 'settings', 'Ajustes', 'Avisos, Google Calendar y atajos')}
-  </ul>`;
+  </ul>
+  <h2 class="sec">Para tu proyecto de Claude</h2>
+  <div class="group c-form">
+    <p class="free">Copia un resumen de todo lo que tienes en Séneca y pégalo en tu proyecto de Claude para que sepa cómo vas.</p>
+    <button type="button" class="btn" data-act="claudecopy">${icon('check')}Copiar resumen para Claude</button>
+  </div>`;
   return { title: 'Más', sub: 'Todos los apartados', html };
 }
 
@@ -1058,6 +1063,78 @@ const views = {
   inicio: viewInicio, hoy: viewHoy, semana: viewSemana, examenes: viewExamenes, habitos: viewHabitos,
   horario: viewHorario, biblioteca: viewBiblioteca, cartera: viewCartera, contadores: viewContadores, revision: viewRevision, ajustes: viewAjustes, mas: viewMas,
 };
+
+/* ---------- Resumen en texto para pegar en un proyecto de Claude ---------- */
+function claudeSummary() {
+  const t = today(), items = live(state.items);
+  const L = [], h = (x) => L.push('', `## ${x}`);
+  const line = (i) => `- ${[i.time, i.end && `–${i.end}`].filter(Boolean).join('')}${i.time ? ' ' : ''}${i.title}${i.type === 'exam' ? ' (examen)' : i.type === 'class' ? ' (clase)' : i.type === 'event' ? ' (cita)' : ''}${i.place ? ` · ${i.place}` : ''}${i.prio === 2 ? ' · prioridad alta' : ''}${i.done ? ' · hecho' : ''}`;
+  L.push(`# Mi Séneca, ${fLong(t)} (${nowHM()})`);
+  h('Hoy');
+  const todays = dayItems(items, t).sort(sortDay);
+  L.push(...(todays.length ? todays.map(line) : ['- Nada planeado']));
+  const overdue = overdueTasks();
+  if (overdue.length) { h('Tareas atrasadas'); L.push(...overdue.map((i) => `- ${i.title} (era el ${fShort(i.date)})`)); }
+  h('Próximos 14 días');
+  for (let k = 1; k <= 14; k++) {
+    const d = addDays(t, k), its = dayItems(items, d).filter((i) => i.type !== 'class').sort(sortDay);
+    if (its.length) L.push(`- ${cap(fDay(d))}: ${its.map((i) => `${i.time ? i.time + ' ' : ''}${i.title}${i.type === 'exam' ? ' (examen)' : ''}${i.prio === 2 ? ' [alta]' : ''}`).join('; ')}`);
+  }
+  const exams = items.filter((i) => i.type === 'exam' && !i.repeat && i.date >= t).sort((a, b) => a.date.localeCompare(b.date));
+  if (exams.length) {
+    h('Exámenes');
+    L.push(...exams.map((e) => `- ${e.title}: ${fShort(e.date)}${e.time ? ` a las ${e.time}` : ''} (${countLabel(e.date).t.toLowerCase()})${e.subs?.length ? ` · temario ${e.subs.filter((x) => x.done).length}/${e.subs.length}` : ''}`));
+  }
+  const cls = live(state.classes).filter((c) => !c.until || c.until >= t);
+  if (cls.length) {
+    h('Horario de clases');
+    for (const d of WD_ORDER) {
+      const cs = cls.filter((c) => c.days?.includes(d)).sort((a, b) => a.start.localeCompare(b.start));
+      if (cs.length) L.push(`- ${WD_NAME[d]}: ${cs.map((c) => `${c.start}–${c.end} ${c.name}${c.place ? ` (${c.place})` : ''}`).join('; ')}`);
+    }
+  }
+  const habits = live(state.habits);
+  if (habits.length) {
+    h('Hábitos');
+    const days = Array.from({ length: 30 }, (_, n) => addDays(t, -n));
+    L.push(...habits.map((x) => `- ${x.name}: ${x.log[t] ? 'hecho hoy' : 'pendiente hoy'} · racha ${streak(x)} días · ${days.filter((d) => x.log[d]).length}/30 días`));
+  }
+  const { xs, inc, exp, bal } = walletTotals(t.slice(0, 7));
+  if (xs.length) {
+    h(`Cartera de ${fMonth(t.slice(0, 7))}`);
+    L.push(`- Ingresos ${eur(inc)} · gastos ${eur(exp)} · saldo ${eur(bal)}`);
+    const cats = {};
+    for (const x of xs) if (x.kind === 'out') cats[x.cat] = r2((cats[x.cat] || 0) + x.amount);
+    const top = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+    if (top.length) L.push(`- Gastos por categoría: ${top.map(([c, v]) => `${c} ${eur(v)}`).join(', ')}`);
+    L.push(...xs.map((x) => `- ${fShort(x.day)} ${x.kind === 'in' ? '+' : '−'}${eur(x.amount)} ${x.title || x.cat} (${x.cat}${x.monthly ? ', mensual' : ''})`));
+  }
+  const cs = live(state.counters);
+  if (cs.length) { h('Contadores'); L.push(...cs.map((c) => `- ${c.name}: ${num0(r2(counterTotal(c)))}${c.unit ? ' ' + c.unit : ''}${c.goal ? ` de ${num0(c.goal)} (meta)` : ''}`)); }
+  const lib = live(state.library).filter((x) => x.status === 'now');
+  if (lib.length) { h('Leyendo y jugando'); L.push(...lib.map((x) => `- ${x.kind === 'book' ? 'Libro' : 'Juego'}: ${x.title}${x.by ? ` (${x.by})` : ''} · ${libPct(x)} %`)); }
+  const imp = MAIL?.items?.filter((x) => x.p === 2) || [];
+  if (imp.length) { h('Correos importantes (último resumen)'); L.push(...imp.map((x) => `- ${x.uni ? '[Universidad] ' : ''}${x.from}: ${x.subject}${x.summary ? ` — ${x.summary}` : ''}`)); }
+  const focus = live(state.focus).filter((f) => f.date >= addDays(t, -6));
+  if (focus.length) {
+    const by = {};
+    for (const f of focus) by[f.label] = (by[f.label] || 0) + f.min;
+    h('Estudio (últimos 7 días)');
+    L.push(...Object.entries(by).sort((a, b) => b[1] - a[1]).map(([l, m]) => `- ${l}: ${hm(m)}`));
+  }
+  return L.join('\n');
+}
+async function copyClaude() {
+  const text = claudeSummary();
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = Object.assign(document.createElement('textarea'), { value: text });
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  }
+  toast('Copiado. Pégalo en tu proyecto de Claude.');
+}
 
 /* ---------- Avisos (mientras la app está abierta) ---------- */
 function readJSON(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }
@@ -1490,6 +1567,7 @@ $('#view').addEventListener('click', (e) => {
   else if (act === 'libtab') { libTab = b.dataset.tab; setPref('libTab', libTab); render(); }
   else if (act === 'libnew') openLib(null);
   else if (act === 'walnew') openWallet(null);
+  else if (act === 'claudecopy') copyClaude();
   else if (act === 'clsnew') openClass(null);
   else if (act === 'clsedit') openClass(state.classes.find((x) => x.id === id));
   else if (act === 'walledit') openWallet(state.wallet.find((x) => x.id === id));

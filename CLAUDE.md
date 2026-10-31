@@ -70,6 +70,10 @@ Al subir a `main`, el workflow `publicar.yml` despliega en Firebase Hosting usan
 3. `notify/plan.mjs` decide: hasta 20 min antes de lo que tenga hora (GitHub retrasa a veces el cron), el día antes de un examen desde las 9:00 y un resumen de 7:00 a 10:00 en la zona horaria del usuario.
 4. `sw.js` muestra el aviso. Mientras un dispositivo tenga token, la app no duplica avisos desde dentro (`notifyCheck`).
 
+## Copiar para Claude
+
+En Más hay un botón «Copiar resumen para Claude» (`claudeSummary()` en `app.js`): copia en Markdown hoy, atrasadas, próximos 14 días, exámenes con temario, horario, hábitos, cartera del mes, contadores, biblioteca, estudio y correos importantes. El usuario lo pega en su proyecto de Claude, que no tiene acceso a Séneca. Si añades un apartado nuevo, añádelo también ahí.
+
 ## Resumen de correo
 
 1. La tarea programada de Claude «Correo Séneca» (7:18 y 19:18, hora de Madrid) lee Gmail, clasifica cada hilo en `p` 2 (importante), 1 (para leer) o 0 (puede esperar) y escribe `{ email, items: [{ p, from, subject, summary, thread, uni }] }`. `uni: true` marca la universidad (us.es, Enseñanza Virtual…): `correo.mjs` la sube a `p` 2 y la ordena antes que el resto, y la app la muestra con birrete y la etiqueta «Universidad».
