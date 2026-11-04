@@ -630,3 +630,62 @@ a.body { color: inherit; text-decoration: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Tráguese ese sapo (ABCDE) ---------- */
+fieldset.field { border: 0; padding: 0; min-width: 0; }
+fieldset.field > legend { font-size: 0.875rem; color: var(--text2); font-weight: 500; padding: 0; margin-bottom: 6px; }
+.abc-pick { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.abc-pick label {
+  position: relative; display: grid; justify-items: center; gap: 0; min-height: 52px; padding: 6px 2px;
+  border-radius: 12px; background: var(--bg); color: var(--text2); cursor: pointer;
+  border: 2px solid transparent; transition: border-color 0.15s, color 0.15s;
+}
+.abc-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.abc-pick b { font-size: 1.125rem; line-height: 1.2; }
+.abc-pick span { font-size: 0.6875rem; }
+.abc-pick label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.abc-pick label:has(input:checked) { color: var(--text); border-color: var(--abc); }
+.abc-pick label:has(input:checked) b { color: var(--abc); }
+.abc-a { --abc: var(--hot); }
+.abc-b { --abc: var(--c-task); }
+.abc-c { --abc: var(--c-event); }
+.abc-d { --abc: var(--t3); }
+.abc-e { --abc: var(--text2); }
+/* Etiqueta en cada tarea: «A-1», «B», «D · delegar» */
+.abc-tag { font-weight: 700; color: var(--abc); font-variant-numeric: tabular-nums; }
+.row.abc-row-e .title { color: var(--text2); }
+
+/* Tarjeta «Tu sapo de hoy» */
+.frog {
+  display: grid; gap: 10px; padding: 16px; margin-bottom: 8px;
+  background: var(--surface); border-radius: var(--r);
+  border-left: 5px solid var(--hot);
+}
+.frog.eaten { border-left-color: var(--c-event); }
+.frog-head { display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; font-weight: 600; color: var(--hot); text-transform: uppercase; letter-spacing: 0.04em; }
+.frog.eaten .frog-head { color: var(--c-event); }
+.frog-head .i { width: 22px; height: 22px; }
+.frog-title { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.frog-meta { font-size: 0.875rem; color: var(--text2); }
+.frog-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.frog-acts .btn, .frog-acts .ghost-btn { min-height: 44px; }
+.frog-streak { font-size: 0.875rem; color: var(--text2); }
+.frog-streak strong { color: var(--text); }
+
+/* Modo foco a pantalla completa (sin móvil) */
+.focus.zen {
+  inset: 0; width: auto; border-radius: 0; z-index: 30; min-height: 100dvh;
+  flex-direction: column; justify-content: center; gap: 24px; padding: 24px;
+  background: var(--bg); box-shadow: none;
+}
+.focus.zen .focus-info { flex: 0; justify-items: center; text-align: center; gap: 8px; }
+.focus.zen .focus-label { font-size: 1.25rem; color: var(--text); white-space: normal; font-weight: 600; }
+.focus.zen .focus-time { font-size: clamp(4rem, 22vw, 8rem); font-weight: 700; letter-spacing: -0.03em; }
+.focus.zen .focus-zen-note { font-size: 0.9375rem; color: var(--text2); text-align: center; max-width: 30ch; }
+.focus.zen .focus-btns { display: flex; gap: 16px; }
+.focus.zen .icon-btn { width: 64px; height: 64px; border-radius: 50%; background: var(--surface); }
+.focus:not(.zen) .focus-zen-note { display: none; }
+.focus .focus-btns { display: contents; }
+@media (min-width: 880px) { .focus.zen { left: 0; right: 0; bottom: 0; width: auto; } }
+.hint[hidden] { display: none; }
+.dash-col > .frog:first-child { margin-top: 20px; }

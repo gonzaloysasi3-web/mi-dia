@@ -1,6 +1,6 @@
 // Decide qué avisos tocan ahora para un usuario. No toca la red: se puede probar con datos de ejemplo.
 import { addDays } from '../dates.js';
-import { itemsOn, classesOn } from '../quick.js';
+import { itemsOn, classesOn, frogOf } from '../quick.js';
 
 const LEAD_MIN = 20; // GitHub Actions puede retrasarse unos minutos: se avisa en los 20 min previos
 
@@ -46,7 +46,15 @@ export function due(state, tz, sent = {}, date = new Date()) {
       n('class') && plural(n('class'), 'clase', 'clases'),
     ].filter(Boolean);
     const first = todays.filter((i) => i.time).sort((a, b) => (a.time < b.time ? -1 : 1))[0];
-    add(`morning:${day}`, 'Tu día', parts.join(', ') + (first ? `. Lo primero, a las ${first.time}: ${first.title}.` : '.'));
+    const frog = frogOf([...items.filter((i) => i.type === 'task' && !i.repeat && !i.done && i.date < day), ...todays].filter((i) => !i.done));
+    add(`morning:${day}`, frog ? `Tu sapo de hoy: ${frog.title}` : 'Tu día',
+      parts.join(', ') + (frog ? '. Cómete el sapo primero.' : first ? `. Lo primero, a las ${first.time}: ${first.title}.` : '.'));
+  }
+
+  // «Tráguese ese sapo»: planificar la noche anterior. De 21:00 a 23:00, si mañana no hay ninguna tarea A.
+  if (min >= 21 * 60 && min < 23 * 60) {
+    const tomorrow = addDays(day, 1);
+    if (!frogOf(itemsOn(items, tomorrow))) add(`frog:${tomorrow}`, '¿Cuál es tu sapo de mañana?', 'Elige esta noche la tarea más importante de mañana y márcala como A.');
   }
   return out;
 }

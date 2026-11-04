@@ -1,6 +1,6 @@
 import * as sync from './sync.js';
 import { pad, ymd, parse, today, addDays, diffDays } from './dates.js';
-import { parseQuick, itemsOn, classesOn, repeatLabel, encodeRepeat, decodeRepeat } from './quick.js';
+import { parseQuick, itemsOn, classesOn, repeatLabel, encodeRepeat, decodeRepeat, ABC, abcOf, prioOf, abcLabel, abcCmp, frogOf } from './quick.js';
 
 const KEY = 'midia.v1';
 const $ = (s, r = document) => r.querySelector(s);
@@ -72,6 +72,8 @@ function mergeRemote(remote) {
 function sortDay(a, b) {
   if (!!a.time !== !!b.time) return a.time ? 1 : -1;
   if (a.time !== b.time) return a.time < b.time ? -1 : 1;
+  const ta = a.type === 'task', tb = b.type === 'task';
+  if (ta && tb) return abcCmp(a, b) || a.title.localeCompare(b.title, 'es');
   return (b.prio || 0) - (a.prio || 0) || a.title.localeCompare(b.title, 'es');
 }
 
@@ -127,12 +129,16 @@ function row(it, tt) {
     : `<span class="lead">${icon(it.type === 'exam' ? 'exam' : 'event')}</span>`;
   const meta = [];
   if (it.type === 'exam') meta.push('Examen');
-  if (task && it.prio === 2) meta.push('<span class="p2">Prioridad alta</span>');
+  if (task) {
+    const a = abcOf(it);
+    meta.push(`<span class="abc-tag abc-${a.toLowerCase()}">${abcLabel(it)}${a === 'A' ? ' · Sapo' : a === 'D' ? ' · Delegar' : a === 'E' ? ' · Posponible' : ''}</span>`);
+    if (it.dur) meta.push(hm(it.dur));
+  }
   if (it.place) meta.push(esc(it.place));
   if (it.repeat) meta.push(repeatLabel(it.repeat));
   if (it.subs?.length) meta.push(`${it.subs.filter((s) => s.done).length}/${it.subs.length} subtareas`);
   if (it.tags?.length) meta.push(it.tags.map(tagHtml).join(' '));
-  return `<li class="row${tt === null ? ' notime' : ''}${it.done ? ' done' : ''}">
+  return `<li class="row${tt === null ? ' notime' : ''}${it.done ? ' done' : ''}${task && abcOf(it) === 'E' ? ' abc-row-e' : ''}">
     ${tt === null ? '' : `<span class="time">${tt}</span>`}${lead}
     <button type="button" class="body" data-act="edit" data-id="${it.id}"><span class="title">${esc(it.title)}</span>${meta.length ? `<span class="meta">${meta.join(' · ')}</span>` : ''}</button>
   </li>`;
@@ -209,6 +215,48 @@ function streak(h) {
   return n;
 }
 
+/* ---------- Tráguese ese sapo ---------- */
+// El sapo de un día: la primera tarea A de ese día (las atrasadas A cuentan para hoy)
+function frogFor(d) {
+  const items = live(state.items);
+  const its = itemsOn(items, d);
+  const late = d === today() ? items.filter((i) => i.type === 'task' && !i.repeat && !i.done && i.date < d) : [];
+  const pend = frogOf([...late, ...its].filter((i) => !i.done));
+  return pend || frogOf(its.filter((i) => i.done)) && { ...frogOf(its.filter((i) => i.done)), eaten: true } || null;
+}
+// Días seguidos comiéndote el sapo (un día sin tarea A corta la racha; hoy cuenta solo si ya está hecho)
+function frogStreak() {
+  const items = live(state.items);
+  let d = today(), n = 0;
+  const ok = (day) => { const a = itemsOn(items, day).filter((i) => i.type === 'task' && abcOf(i) === 'A'); return a.length && frogOf(a).done; };
+  if (!ok(d)) d = addDays(d, -1);
+  while (ok(d) && n < 366) { n++; d = addDays(d, -1); }
+  return n;
+}
+function frogHtml(d = today()) {
+  const f = frogFor(d);
+  const isToday = d === today();
+  const streak = frogStreak();
+  const st = streak ? `<p class="frog-streak">Racha: <strong>${plural(streak, ['día', 'días'])}</strong> comiéndote el sapo.</p>` : '';
+  const head = (txt) => `<p class="frog-head">${icon('frog')}${txt}</p>`;
+  if (!f) {
+    return `<section class="frog" aria-label="Sapo">${head(isToday ? 'Tu sapo de hoy' : 'El sapo de mañana')}
+      <p class="frog-meta">${isToday ? 'No tienes ninguna tarea A para hoy. ¿Cuál es la tarea más importante, la que tendría consecuencias graves si no la haces?' : 'Planifica esta noche la tarea más importante de mañana: así empiezas el día sabiendo qué hacer primero.'}</p>
+      <div class="frog-acts"><button type="button" class="btn" data-act="addfrog" data-date="${d}">${icon('plus')}Elegir el sapo</button></div>${isToday ? st : ''}</section>`;
+  }
+  if (f.eaten) {
+    return `<section class="frog eaten" aria-label="Sapo">${head('Sapo comido')}
+      <p class="frog-title">${esc(f.title)}</p><p class="frog-meta">Lo más difícil del día ya está. Lo demás es cuesta abajo.</p>${st}</section>`;
+  }
+  const meta = [abcLabel(f), f.dur && hm(f.dur), f.date < d && `atrasada desde el ${fShort(f.date)}`].filter(Boolean).join(' · ');
+  return `<section class="frog" aria-label="Sapo">${head(isToday ? 'Tu sapo de hoy: cómetelo primero' : 'El sapo de mañana')}
+    <p class="frog-title">${esc(f.title)}</p><p class="frog-meta">${meta}</p>
+    <div class="frog-acts">
+      ${isToday ? `<button type="button" class="btn" data-act="frogfocus" data-id="${f.id}">${icon('play')}Empezar sin móvil ${f.dur ? hm(f.dur) : '25 min'}</button>
+      <button type="button" class="ghost-btn" data-act="toggle" data-id="${f.id}" data-date="${f.repeat ? d : f.date}">${icon('check')}Hecho</button>` : `<button type="button" class="ghost-btn" data-act="edit" data-id="${f.id}">Cambiar</button>`}
+    </div>${isToday ? st : ''}</section>`;
+}
+
 /* ---------- Vistas ---------- */
 function viewHoy() {
   const t = today(), now = nowHM();
@@ -228,6 +276,7 @@ function viewHoy() {
     <button type="button" data-act="hoymode" data-mode="list" aria-pressed="${hoyMode === 'list'}">Lista</button>
     <button type="button" data-act="hoymode" data-mode="blocks" aria-pressed="${hoyMode === 'blocks'}">Bloques de tiempo</button></div>`;
   if (hoyMode === 'blocks') return { title: 'Hoy', sub: [fLong(t), bits.join(' · ')], html: html + blocksHtml(todays) };
+  if (!tagFilter) html += frogHtml();
   if (overdue.length) {
     html += `<h2 class="sec sec-first">Atrasadas</h2><ul class="group">${overdue.map((i) => row(i, fShort(i.date))).join('')}</ul>`;
   }
@@ -422,6 +471,8 @@ function viewInicio() {
       <button type="button" class="tile" data-act="go" data-view="${v}">${icon(ic)}<span class="tile-name">${name}</span><span class="tile-sum">${sum}</span></button>`).join('')}
     </nav>
     <div class="dash"><div class="dash-col">
+      ${frogHtml()}
+      ${h >= 19 ? frogHtml(addDays(t, 1)) : ''}
       <section class="p-next" aria-labelledby="h-next"><h2 class="sec" id="h-next">A continuación</h2>
         ${next.length ? `<ul class="group">${next.map((i) => row(i, i.time || '')).join('')}</ul>`
           : `<div class="group empty"><p>${todays.length ? 'Nada más por hoy.' : 'Nada planeado para hoy.'}</p><button type="button" class="btn" data-act="add">${icon('plus')}Añadir</button></div>`}
@@ -934,6 +985,17 @@ function mailHtml() {
 
 /* ---------- Revisión semanal ---------- */
 const overdueTasks = () => live(state.items).filter((i) => i.type === 'task' && !i.repeat && !i.done && i.date < today()).sort((a, b) => a.date.localeCompare(b.date));
+function frogsWeek(from) {
+  const items = live(state.items);
+  let con = 0, comidos = 0;
+  for (let k = 0; k < 7; k++) {
+    const a = itemsOn(items, addDays(from, k)).filter((i) => i.type === 'task' && abcOf(i) === 'A');
+    if (!a.length) continue;
+    con++;
+    if (frogOf(a).done) comidos++;
+  }
+  return con ? `${comidos} de ${plural(con, ['día', 'días'])} con sapo` : 'Ningún día con sapo';
+}
 function viewRevision() {
   const t = today(), from = addDays(t, -6);
   const items = live(state.items);
@@ -952,6 +1014,7 @@ function viewRevision() {
 
   let html = `<h2 class="sec sec-first">Últimos 7 días</h2><ul class="group stats">
     <li><span>Tareas hechas</span><strong>${done} de ${tot}</strong></li>
+    <li><span>Sapos comidos</span><strong>${frogsWeek(from)}</strong></li>
     <li><span>Tiempo de estudio</span><strong>${hm(mins)}</strong></li>
     <li><span>Hábitos cumplidos</span><strong>${habits.length ? Math.round((hDone / (habits.length * 7)) * 100) + ' %' : 'Sin hábitos'}</strong></li>
     <li><span>Libros y juegos terminados</span><strong>${libDone}</strong></li>
@@ -1068,8 +1131,9 @@ const views = {
 function claudeSummary() {
   const t = today(), items = live(state.items);
   const L = [], h = (x) => L.push('', `## ${x}`);
-  const line = (i) => `- ${[i.time, i.end && `–${i.end}`].filter(Boolean).join('')}${i.time ? ' ' : ''}${i.title}${i.type === 'exam' ? ' (examen)' : i.type === 'class' ? ' (clase)' : i.type === 'event' ? ' (cita)' : ''}${i.place ? ` · ${i.place}` : ''}${i.prio === 2 ? ' · prioridad alta' : ''}${i.done ? ' · hecho' : ''}`;
+  const line = (i) => `- ${[i.time, i.end && `–${i.end}`].filter(Boolean).join('')}${i.time ? ' ' : ''}${i.title}${i.type === 'exam' ? ' (examen)' : i.type === 'class' ? ' (clase)' : i.type === 'event' ? ' (cita)' : ''}${i.place ? ` · ${i.place}` : ''}${i.type === 'task' ? ` · ${abcLabel(i)}${abcOf(i) === 'A' ? ' (sapo)' : ''}${i.dur ? ` · ${hm(i.dur)}` : ''}` : ''}${i.done ? ' · hecho' : ''}`;
   L.push(`# Mi Séneca, ${fLong(t)} (${nowHM()})`);
+  { const f = frogFor(t); L.push('', f ? `**Sapo de hoy (método «Tráguese ese sapo»):** ${f.title}${f.eaten ? ' (ya comido)' : ''}` : '**Sapo de hoy:** sin elegir', `Racha de sapos comidos: ${plural(frogStreak(), ['día', 'días'])}`); }
   h('Hoy');
   const todays = dayItems(items, t).sort(sortDay);
   L.push(...(todays.length ? todays.map(line) : ['- Nada planeado']));
@@ -1078,7 +1142,7 @@ function claudeSummary() {
   h('Próximos 14 días');
   for (let k = 1; k <= 14; k++) {
     const d = addDays(t, k), its = dayItems(items, d).filter((i) => i.type !== 'class').sort(sortDay);
-    if (its.length) L.push(`- ${cap(fDay(d))}: ${its.map((i) => `${i.time ? i.time + ' ' : ''}${i.title}${i.type === 'exam' ? ' (examen)' : ''}${i.prio === 2 ? ' [alta]' : ''}`).join('; ')}`);
+    if (its.length) L.push(`- ${cap(fDay(d))}: ${its.map((i) => `${i.time ? i.time + ' ' : ''}${i.title}${i.type === 'exam' ? ' (examen)' : ''}${i.type === 'task' ? ` [${abcLabel(i)}]` : ''}`).join('; ')}`);
   }
   const exams = items.filter((i) => i.type === 'exam' && !i.repeat && i.date >= t).sort((a, b) => a.date.localeCompare(b.date));
   if (exams.length) {
@@ -1380,7 +1444,7 @@ $('#subList').addEventListener('click', (e) => { const b = e.target.closest('[da
 
 const TYPE_LABEL = { task: 'Tarea', event: 'Cita', exam: 'Examen' };
 const quickLines = () => form.quick.value.split('\n').map((l) => l.trim()).filter(Boolean);
-const withDefaults = (p) => ({ type: 'task', date: today(), time: '', place: '', prio: 1, ...p });
+const withDefaults = (p) => ({ type: 'task', date: today(), time: '', place: '', prio: 1, abc: 'B', ...p, ...(p.abc ? {} : { abc: abcOf({ prio: p.prio ?? 1 }) }) });
 function summary(p) {
   const x = withDefaults(p);
   return [TYPE_LABEL[x.type], x.title || '(sin título)', fShort(x.date), x.time, x.place, repeatLabel(x.repeat), (x.tags || []).map((t) => '#' + t).join(' ')].filter(Boolean).join(' · ');
@@ -1400,7 +1464,7 @@ function onQuick() {
   form.date.value = p.date;
   form.time.value = p.time;
   form.place.value = p.place;
-  form.prio.value = String(p.prio);
+  setAbc(p.abc, p.rank, p.dur);
   form.tags.value = (p.tags || []).join(', ');
   setRepeat(p.type === 'exam' ? null : p.repeat);
   syncFields();
@@ -1408,6 +1472,18 @@ function onQuick() {
 }
 form.quick.addEventListener('input', onQuick);
 
+function setAbc(abc, rank, dur) {
+  form.abc.value = abc || 'B';
+  form.rank.value = rank ? String(rank) : '';
+  form.dur.value = dur ? String(dur) : '';
+  if (dur && !form.dur.value) { form.dur.add(new Option(hm(dur), String(dur))); form.dur.value = String(dur); }
+  paintAbc();
+}
+function paintAbc() {
+  const a = form.abc.value;
+  $('#abcHint').textContent = ABC[a] ? `${ABC[a][0]}: ${ABC[a][1].toLowerCase()}.` : '';
+  $('#fldRank').hidden = a !== 'A';
+}
 function openSheet(item, defaults = {}) {
   editing = item;
   form.reset();
@@ -1417,7 +1493,7 @@ function openSheet(item, defaults = {}) {
   form.date.value = src.date;
   form.time.value = src.time || '';
   form.place.value = src.place || '';
-  form.prio.value = String(src.prio ?? 1);
+  setAbc(src.type === 'task' ? abcOf(src) : 'B', src.rank, src.dur);
   form.tags.value = (src.tags || []).join(', ');
   form.quick.value = '';
   form.title.required = true;
@@ -1433,7 +1509,7 @@ function openSheet(item, defaults = {}) {
   if (!item) form.quick.focus();
 }
 
-form.addEventListener('change', (e) => { if (e.target.name === 'type') syncFields(); });
+form.addEventListener('change', (e) => { if (e.target.name === 'type') syncFields(); if (e.target.name === 'abc') paintAbc(); });
 form.addEventListener('submit', (e) => {
   e.preventDefault();
   const lines = quickLines();
@@ -1443,7 +1519,8 @@ form.addEventListener('submit', (e) => {
       upsert(state.items, {
         id: uid(), done: false, ...p,
         place: p.type === 'task' ? '' : p.place,
-        prio: p.type === 'task' ? p.prio : 0,
+        prio: p.type === 'task' ? prioOf(p.abc) : 0,
+        abc: p.type === 'task' ? p.abc : undefined,
         repeat: p.type === 'exam' ? null : p.repeat || null,
       });
     }
@@ -1463,13 +1540,17 @@ form.addEventListener('submit', (e) => {
     date: f.get('date') || today(),
     time: f.get('time') || '',
     place: type === 'task' ? '' : String(f.get('place')).trim(),
-    prio: type === 'task' ? Number(f.get('prio')) : 0,
+    prio: type === 'task' ? prioOf(f.get('abc')) : 0,
+    abc: type === 'task' ? f.get('abc') : undefined,
+    rank: type === 'task' && f.get('abc') === 'A' && f.get('rank') ? Number(f.get('rank')) : undefined,
+    dur: type !== 'event' && f.get('dur') ? Number(f.get('dur')) : undefined,
     tags,
     repeat: type === 'exam' ? null : decodeRepeat(f.get('repeat')),
     subs: type === 'event' ? [] : subs,
   });
   if (type !== 'task') it.done = false;
   if (!it.repeat) delete it.doneOn;
+  for (const k of ['abc', 'rank', 'dur']) if (it[k] === undefined) delete it[k];
   upsert(state.items, it);
   dlg.close();
   commit();
@@ -1489,10 +1570,10 @@ const subjectOf = (it) => (it.type === 'task' && it.tags?.length ? '#' + it.tags
 const leftMs = () => (run.endAt ? Math.max(0, run.endAt - Date.now()) : run.left);
 function saveRun() { if (run) setPref('focus', JSON.stringify(run)); else try { localStorage.removeItem('midia.focus'); } catch {} }
 
-function startFocus(it) {
+function startFocus(it, min = FOCUS_MIN, zen = false) {
   if (run) return toast('Ya tienes un Pomodoro en marcha.');
-  const dur = FOCUS_MIN * 60000;
-  run = { ref: it.id, label: subjectOf(it), dur, endAt: Date.now() + dur, left: null };
+  const dur = min * 60000;
+  run = { ref: it.id, label: zen ? it.title : subjectOf(it), dur, endAt: Date.now() + dur, left: null, zen };
   saveRun();
   paintFocus();
 }
@@ -1514,9 +1595,11 @@ function paintFocus() {
   if (!run) { el.hidden = true; return; }
   el.hidden = false;
   const playing = !!run.endAt;
+  el.classList.toggle('zen', !!run.zen);
   el.innerHTML = `<div class="focus-info"><span class="focus-label">${esc(run.label)}</span><span class="focus-time"></span></div>
-    <button type="button" class="icon-btn" data-f="toggle" aria-label="${playing ? 'Pausar' : 'Seguir'}">${icon(playing ? 'pause' : 'play')}</button>
-    <button type="button" class="icon-btn" data-f="stop" aria-label="Terminar y guardar">${icon('stop')}</button>`;
+    <p class="focus-zen-note">Modo foco: deja el móvil boca abajo y no hagas nada más hasta que suene.</p>
+    <div class="focus-btns"><button type="button" class="icon-btn" data-f="toggle" aria-label="${playing ? 'Pausar' : 'Seguir'}">${icon(playing ? 'pause' : 'play')}</button>
+    <button type="button" class="icon-btn" data-f="stop" aria-label="Terminar y guardar">${icon('stop')}</button></div>`;
   tickFocus();
 }
 function tickFocus() {
@@ -1636,7 +1719,11 @@ $('#view').addEventListener('click', (e) => {
     } else upsert(state.items, { ...it, done: !it.done });
     popId = id;
     commit();
-  } else if (act === 'edit') openSheet(state.items.find((x) => x.id === id));
+  } else if (act === 'frogfocus') {
+    const it = state.items.find((x) => x.id === id);
+    if (it) startFocus(it, it.dur || FOCUS_MIN, true);
+  } else if (act === 'addfrog') openSheet(null, { date, abc: 'A', rank: 1, prio: 2 });
+  else if (act === 'edit') openSheet(state.items.find((x) => x.id === id));
   else if (act === 'add') openSheet(null, b.dataset.type ? { type: b.dataset.type } : {});
   else if (act === 'addday') openSheet(null, { date });
   else if (act === 'week') { weekStart = b.dataset.d === '0' ? mondayOf(today()) : addDays(weekStart, Number(b.dataset.d)); render(); }

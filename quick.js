@@ -36,6 +36,23 @@ export function occurs(it, d) {
 }
 
 // Instancias de un día: las repetidas llevan su propio "hecho" por fecha.
+// Método «Tráguese ese sapo» (Brian Tracy): ABCDE. A = sapo (consecuencias graves), B = importante,
+// C = rutina, D = delegable, E = posponible. Las tareas antiguas sin «abc» salen de su prioridad.
+export const ABC = {
+  A: ['Sapo', 'Consecuencias graves si no la haces'],
+  B: ['Importante', 'Consecuencias leves'],
+  C: ['Rutina', 'Sin consecuencias'],
+  D: ['Delegable', 'Que la haga otra persona'],
+  E: ['Posponible', 'Se puede dejar para más adelante'],
+};
+export const abcOf = (it) => it.abc || (it.prio === 2 ? 'A' : it.prio === 0 ? 'C' : 'B');
+export const prioOf = (abc) => (abc === 'A' ? 2 : abc === 'B' ? 1 : 0);
+export const abcLabel = (it) => { const a = abcOf(it); return a === 'A' && it.rank ? `A-${it.rank}` : a; };
+// Orden de las tareas: A-1, A-2…, A, B, C, D, E
+export const abcCmp = (a, b) => abcOf(a).localeCompare(abcOf(b)) || (a.rank || 99) - (b.rank || 99);
+// El sapo del día: la primera tarea A (por su número) de las de ese día
+export const frogOf = (dayItems) => dayItems.filter((i) => i.type === 'task' && abcOf(i) === 'A').sort(abcCmp)[0] || null;
+
 export const itemsOn = (items, d) => items
   .filter((i) => occurs(i, d))
   .map((i) => (i.repeat ? { ...i, date: d, done: !!i.doneOn?.[d] } : i));
@@ -80,8 +97,14 @@ export function parseQuick(text, base = today()) {
   if (tags.length) out.tags = [...new Set(tags)];
 
   // Prioridad
-  take(/\s(?:prioridad\s+alta|urgente|importante|!+)(?=\s)/i, () => { out.prio = 2; })
-    || take(/\sprioridad\s+(media|baja)(?=\s)/i, (m) => { out.prio = m[1].toLowerCase() === 'baja' ? 0 : 1; });
+  // ABCDE: «sapo», «!a1», «!b»… (y lo de siempre: «urgente», «!», «prioridad baja»)
+  take(/\s(?:sapo|!a)(\d)?(?=\s)/i, (m) => { out.abc = 'A'; if (m[1]) out.rank = Number(m[1]); })
+    || take(/\s!([b-e])(?=\s)/i, (m) => { out.abc = m[1].toUpperCase(); })
+    || take(/\s(?:prioridad\s+alta|urgente|importante|!+)(?=\s)/i, () => { out.abc = 'A'; })
+    || take(/\sprioridad\s+(media|baja)(?=\s)/i, (m) => { out.abc = m[1].toLowerCase() === 'baja' ? 'C' : 'B'; });
+  if (out.abc) out.prio = prioOf(out.abc);
+  // Duración estimada: «45 min», «90 minutos»
+  take(/\s(\d{1,3})\s?min(?:utos|s)?(?=\s)/i, (m) => { out.dur = Number(m[1]); });
 
   // Tipo
   if (take(/\sexamen(?:\s+de)?(?=\s)/i, () => {})) out.type = 'exam';

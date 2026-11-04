@@ -45,6 +45,7 @@
     <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
     <symbol id="i-more" viewBox="0 0 24 24"><path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="3"/></symbol>
     <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-frog" viewBox="0 0 24 24"><circle cx="8" cy="7.5" r="2.5"/><circle cx="16" cy="7.5" r="2.5"/><path d="M5.6 8.7C3.9 10.2 3 12 3 14c0 3.6 4 6 9 6s9-2.4 9-6c0-2-.9-3.8-2.6-5.3M8.5 14.5c1 1 2.2 1.5 3.5 1.5s2.5-.5 3.5-1.5"/><path d="M8 7.5h.01M16 7.5h.01" stroke-width="2.5"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 3.5h4M6 7l1 12.5h10L18 7M10 11v5M14 11v5"/></symbol>
   </defs>
 </svg>
@@ -128,13 +129,24 @@
       <label class="field"><span>Etiquetas</span><input name="tags" maxlength="80" placeholder="uni, personal" autocapitalize="none"></label>
     </div>
 
-    <label class="field" id="fldPrio"><span>Prioridad</span>
-      <select name="prio">
-        <option value="0">Baja</option>
-        <option value="1" selected>Media</option>
-        <option value="2">Alta</option>
-      </select>
-    </label>
+    <fieldset class="field" id="fldPrio"><legend>Prioridad (ABCDE)</legend>
+      <div class="abc-pick" role="radiogroup">
+        <label class="abc-a"><input type="radio" name="abc" value="A"><b>A</b><span>Sapo</span></label>
+        <label class="abc-b"><input type="radio" name="abc" value="B" checked><b>B</b><span>Importante</span></label>
+        <label class="abc-c"><input type="radio" name="abc" value="C"><b>C</b><span>Rutina</span></label>
+        <label class="abc-d"><input type="radio" name="abc" value="D"><b>D</b><span>Delegar</span></label>
+        <label class="abc-e"><input type="radio" name="abc" value="E"><b>E</b><span>Posponer</span></label>
+      </div>
+      <p id="abcHint" class="hint"></p>
+      <div class="two">
+        <label class="field" id="fldRank"><span>Orden del sapo</span>
+          <select name="rank"><option value="">Sin orden</option><option value="1">A-1 (el primero)</option><option value="2">A-2</option><option value="3">A-3</option><option value="4">A-4</option></select>
+        </label>
+        <label class="field"><span>Duración estimada</span>
+          <select name="dur"><option value="">Sin estimar</option><option value="15">15 min</option><option value="25">25 min</option><option value="45">45 min</option><option value="60">1 h</option><option value="90">1 h 30 min</option><option value="120">2 h</option><option value="180">3 h</option></select>
+        </label>
+      </div>
+    </fieldset>
 
     <div class="field" id="fldSubs">
       <span id="lblSubs">Subtareas</span>
