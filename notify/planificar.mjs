@@ -69,6 +69,15 @@ if (cmd === 'pedir') {
   const all = [...patched.filter((i) => !(p.add?.items || []).some((x) => x.id === i.id)), ...(p.add?.items || [])];
   const ranks = all.filter((x) => x.type === 'task' && abcOf(x) === 'A' && x.date === p.plan?.date).map((x) => x.rank || 0);
   if (new Set(ranks).size !== ranks.length) errs.push(`rangos A repetidos el ${p.plan?.date}: ${ranks.join(', ')}`);
+  // Ninguna tarea con hora puede pisar una cita, examen o clase de ese día (las citas sin fin cuentan 60 min)
+  const mins = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  const D = p.plan?.date;
+  const fixed = [...itemsOn((state.items || []).filter((i) => i.type !== 'task'), D), ...classesOn(state.classes || [], D)]
+    .filter((i) => i.time).map((i) => ({ t: i.title, a: mins(i.time), z: i.end ? mins(i.end) : mins(i.time) + 60 }));
+  for (const x of all.filter((i) => i.type === 'task' && i.date === D && i.time && !i.done)) {
+    const a = mins(x.time), z = a + (x.dur || 30);
+    for (const f of fixed) if (a < f.z && f.a < z) errs.push(`«${x.title}» (${x.time}, ${x.dur || 30} min) se solapa con «${f.t}»`);
+  }
   if (errs.length) fail('Plan con errores:\n- ' + errs.join('\n- '));
   // Completa lo que la app espera en una tarea nueva
   for (const x of p.add?.items || []) {
