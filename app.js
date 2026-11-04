@@ -276,7 +276,7 @@ function viewHoy() {
     <button type="button" data-act="hoymode" data-mode="list" aria-pressed="${hoyMode === 'list'}">Lista</button>
     <button type="button" data-act="hoymode" data-mode="blocks" aria-pressed="${hoyMode === 'blocks'}">Bloques de tiempo</button></div>`;
   if (hoyMode === 'blocks') return { title: 'Hoy', sub: [fLong(t), bits.join(' · ')], html: html + blocksHtml(todays) };
-  if (!tagFilter) html += frogHtml();
+  if (!tagFilter) html += frogHtml() + planHtml();
   if (overdue.length) {
     html += `<h2 class="sec sec-first">Atrasadas</h2><ul class="group">${overdue.map((i) => row(i, fShort(i.date))).join('')}</ul>`;
   }
@@ -472,7 +472,9 @@ function viewInicio() {
     </nav>
     <div class="dash"><div class="dash-col">
       ${frogHtml()}
+      ${planHtml()}
       ${h >= 19 ? frogHtml(addDays(t, 1)) : ''}
+      ${h >= 19 ? planHtml(addDays(t, 1)) : ''}
       <section class="p-next" aria-labelledby="h-next"><h2 class="sec" id="h-next">A continuación</h2>
         ${next.length ? `<ul class="group">${next.map((i) => row(i, i.time || '')).join('')}</ul>`
           : `<div class="group empty"><p>${todays.length ? 'Nada más por hoy.' : 'Nada planeado para hoy.'}</p><button type="button" class="btn" data-act="add">${icon('plus')}Añadir</button></div>`}
@@ -983,6 +985,29 @@ function mailHtml() {
     ${rest.length ? `<details class="past mail-more"><summary>${plural(rest.length, ['correo más', 'correos más'])}</summary><ul class="group">${rest.map(mailRow).join('')}</ul></details>` : ''}`;
 }
 
+/* ---------- Plan del día (lo prepara la tarea programada de Claude «Plan Séneca» cada noche) ---------- */
+let DAYPLAN = readJSON('midia.dayplan', null);
+function setPlan(p) {
+  if (JSON.stringify(p) === JSON.stringify(DAYPLAN)) return;
+  DAYPLAN = p;
+  writeJSON('midia.dayplan', p);
+  if (view === 'inicio' || view === 'hoy') render();
+}
+// Solo el plan de hoy o el de mañana; uno viejo no se enseña
+function planHtml(d = today()) {
+  if (!DAYPLAN || DAYPLAN.date !== d) return '';
+  const isToday = d === today();
+  const n = live(state.items).filter((i) => i.id.startsWith(`plan-${d}-`));
+  const done = n.filter((i) => i.done).length;
+  const when = new Intl.DateTimeFormat('es-ES', { weekday: 'long', hour: '2-digit', minute: '2-digit' }).format(DAYPLAN.at);
+  return `<section class="plan" aria-label="Plan del día">
+    <p class="plan-head">${icon('review')}${isToday ? 'Plan de hoy' : 'Plan de mañana'}</p>
+    ${DAYPLAN.text ? `<p class="plan-text">${esc(DAYPLAN.text)}</p>` : ''}
+    ${DAYPLAN.points?.length ? `<ul class="plan-points">${DAYPLAN.points.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+    <p class="plan-meta">${n.length ? `${plural(n.length, ['tarea nueva', 'tareas nuevas'])}${isToday ? `, ${done} ${done === 1 ? 'hecha' : 'hechas'}` : ''} · ` : ''}Preparado por Claude el ${esc(when)}</p>
+  </section>`;
+}
+
 /* ---------- Revisión semanal ---------- */
 const overdueTasks = () => live(state.items).filter((i) => i.type === 'task' && !i.repeat && !i.done && i.date < today()).sort((a, b) => a.date.localeCompare(b.date));
 function frogsWeek(from) {
@@ -1134,6 +1159,7 @@ function claudeSummary() {
   const line = (i) => `- ${[i.time, i.end && `–${i.end}`].filter(Boolean).join('')}${i.time ? ' ' : ''}${i.title}${i.type === 'exam' ? ' (examen)' : i.type === 'class' ? ' (clase)' : i.type === 'event' ? ' (cita)' : ''}${i.place ? ` · ${i.place}` : ''}${i.type === 'task' ? ` · ${abcLabel(i)}${abcOf(i) === 'A' ? ' (sapo)' : ''}${i.dur ? ` · ${hm(i.dur)}` : ''}` : ''}${i.done ? ' · hecho' : ''}`;
   L.push(`# Mi Séneca, ${fLong(t)} (${nowHM()})`);
   { const f = frogFor(t); L.push('', f ? `**Sapo de hoy (método «Tráguese ese sapo»):** ${f.title}${f.eaten ? ' (ya comido)' : ''}` : '**Sapo de hoy:** sin elegir', `Racha de sapos comidos: ${plural(frogStreak(), ['día', 'días'])}`); }
+  if (DAYPLAN && DAYPLAN.date >= t) { h(`Plan de Claude para el ${fShort(DAYPLAN.date)}`); L.push(...[DAYPLAN.text, ...(DAYPLAN.points || []).map((x) => `- ${x}`)].filter(Boolean)); }
   h('Hoy');
   const todays = dayItems(items, t).sort(sortDay);
   L.push(...(todays.length ? todays.map(line) : ['- Nada planeado']));
@@ -1788,6 +1814,7 @@ if (location.search) history.replaceState(null, '', location.pathname);
 sync.start({
   merge: mergeRemote,
   mail: setMail,
+  plan: setPlan,
   onStatus: (s) => {
     syncInfo = s;
     paintSync();

@@ -26,7 +26,8 @@ HTML, CSS y JavaScript sin framework ni compilación. Los módulos ES se cargan 
 | `.github/workflows/avisos.yml` | Ejecuta `notify/send.mjs` cada 10 min |
 | `.github/workflows/publicar.yml` | Publica en Firebase Hosting al subir a `main` |
 | `.github/workflows/correo.yml` | Recibe el resumen de Gmail cifrado y lo guarda (`notify/correo.mjs`) |
-| `.github/workflows/importar.yml` | Mete datos cifrados en la cuenta del usuario (`notify/importar.mjs`): `{ email, add: { lista: [elementos con id fijo] } }`. Así se cargó su horario desde una foto |
+| `.github/workflows/importar.yml` | Mete datos cifrados en la cuenta del usuario (`notify/importar.mjs` + `notify/aplicar.mjs`): `{ email, add: { lista: [elementos con id fijo] }, patch: { items: [{ id, abc, rank, dur, date, time, tags }] }, plan }`. Así se cargó su horario desde una foto y así escribe el «Plan Séneca» |
+| `.github/workflows/exportar.yml` | Saca el estado cifrado con una clave temporal de Claude (`notify/exportar.mjs`) para que el «Plan Séneca» pueda leerlo |
 
 ### Vistas
 
@@ -39,7 +40,7 @@ En móvil la barra inferior muestra Inicio, Hoy, Semana, Exámenes y Más; el re
 Estado local en `localStorage` (`midia.v1`) con siete listas: `items`, `habits`, `focus`, `counters`, `library`, `wallet`, `classes`. Cada elemento tiene `id` y `u` (marca de tiempo). Los borrados se marcan con `del: true` y se purgan a los 30 días. Al sincronizar se fusiona por elemento y gana el `u` más reciente.
 
 - `items`: `type` (`task` | `event` | `exam`), `title`, `date`, `time`, `place`, `prio` (0-2), `done`, `tags[]`, `repeat` (`{ f: 'day'|'weekdays'|'week'|'month', n, days[] }`), `doneOn{fecha:1}` para repetidas, `subs[]` (subtareas o temas de examen, con `done` y `doneAt`).
-- Tareas con el método «Tráguese ese sapo» (Brian Tracy): `abc` (`A` sapo, `B` importante, `C` rutina, `D` delegable, `E` posponible), `rank` (A-1, A-2…) y `dur` (minutos estimados). `prio` se sigue guardando (A=2, B=1, resto 0) para lo antiguo; `abcOf()` en `quick.js` da la letra de tareas sin `abc`. El sapo del día es `frogOf()`: la primera A por su número (las A atrasadas cuentan para hoy). En Hoy e Inicio sale la tarjeta «Tu sapo de hoy» con «Empezar sin móvil» (Pomodoro a pantalla completa con su duración) y la racha; desde las 19:00 Inicio enseña también el sapo de mañana. El analizador entiende «sapo», «!a1», «!b»…«!e» y «45 min». `notify/plan.mjs` pone el sapo en el resumen de la mañana y de 21:00 a 23:00 avisa si mañana no hay ninguna A.
+- Tareas con el método «Tráguese ese sapo» (Brian Tracy): `abc` (`A` sapo, `B` importante, `C` rutina, `D` delegable, `E` posponible), `rank` (A-1, A-2…) y `dur` (minutos estimados). `prio` se sigue guardando (A=2, B=1, resto 0) para lo antiguo; `abcOf()` en `quick.js` da la letra de tareas sin `abc`. El sapo del día es `frogOf()`: la primera A por su número (las A atrasadas cuentan para hoy). En Hoy e Inicio sale la tarjeta «Tu sapo de hoy» con «Empezar sin móvil» (Pomodoro a pantalla completa con su duración) y la racha; desde las 19:00 Inicio enseña también el sapo de mañana. El analizador entiende «sapo», «!a1», «!b»…«!e» y «45 min». `notify/plan.mjs` pone el sapo en el resumen de la mañana y de 22:15 a 23:15 avisa si mañana no hay ninguna A.
 - `classes`: horario `{ name, days: [0-6], start, end, place, until? }`. `classesOn()` (en `quick.js`, compartido con `notify/plan.mjs`) las convierte en elementos virtuales de tipo `class` para cada día: salen en Hoy, Semana, Inicio y la lista del calendario (sin punto en la cuadrícula), tienen aviso antes como las citas y su color sigue al nombre (`tagSlot`). No cuentan en «Semana: N elementos».
 - Elementos virtuales que no se guardan: `study` y `review` (plan de estudio que reparte los temas de cada examen) y `gcal` (eventos de Google Calendar, en caché en `midia.gcal`).
 - `focus`: registros de Pomodoro `{ ref, label, date, min }`.
@@ -83,6 +84,16 @@ En Más hay un botón «Copiar resumen para Claude» (`claudeSummary()` en `app.
 4. La app lo recibe en `sync.js` (`hooks.mail`), lo guarda en `midia.mail` y lo pinta en Inicio (`mailHtml()`). Clases `m0`-`m2`, no `p2` (ya existe para prioridad).
 
 Si cambia la cuenta de servicio, vuelve a sacar la clave pública lanzando `correo.yml` sin datos y sustituye `notify/correo-publica.pem`.
+
+## Plan Séneca (planificación diaria con Claude)
+
+Tarea programada de Claude «Plan Séneca», cada noche a las 21:49 (Madrid). Planifica el día siguiente con el método del sapo:
+1. `node notify/planificar.mjs pedir <carpeta> <email>` crea una clave RSA temporal y cifra la petición; lanza `exportar.yml` con ella.
+2. Lee el log del job, `node notify/planificar.mjs leer <carpeta> <log>` lo descifra e imprime el resumen del día a planificar.
+3. Escribe `plan.json` (tareas nuevas con id `plan-AAAA-MM-DD-n` y etiqueta `plan`, cambios ABCDE/fecha en tareas existentes y el texto del plan), `node notify/planificar.mjs enviar <carpeta> plan.json` lo comprueba (rangos A sin repetir, ids existentes) y lo cifra; lanza `importar.yml`.
+4. `users/{uid}.plan = { at, date, text, points[], frog }` llega por `hooks.plan` (`midia.dayplan`) y sale como tarjeta «Plan de hoy/mañana» en Inicio y Hoy (`planHtml()`, la variable es `DAYPLAN`: `PLAN` ya es el plan de estudio). Avisa al móvil.
+
+El aviso «¿Cuál es tu sapo de mañana?» va de 22:15 a 23:15 para no adelantarse al plan.
 
 ## Estado y pendiente
 

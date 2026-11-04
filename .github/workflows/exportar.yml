@@ -1,0 +1,26 @@
+name: Exportar
+
+# Lo lanza la tarea programada de Claude «Plan Séneca» para leer el estado del usuario.
+# La petición va cifrada (notify/planificar.mjs pedir) y el estado sale cifrado con una clave temporal
+# que solo tiene esa sesión de Claude: en el log público solo se ve un bloque ilegible.
+on:
+  workflow_dispatch:
+    inputs:
+      datos:
+        description: Petición cifrada
+        required: true
+
+jobs:
+  exportar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm install --prefix notify --no-audit --no-fund
+      - run: node notify/exportar.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          DATOS: ${{ inputs.datos }}

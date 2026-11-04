@@ -51,8 +51,9 @@ export function due(state, tz, sent = {}, date = new Date()) {
       parts.join(', ') + (frog ? '. Cómete el sapo primero.' : first ? `. Lo primero, a las ${first.time}: ${first.title}.` : '.'));
   }
 
-  // «Tráguese ese sapo»: planificar la noche anterior. De 21:00 a 23:00, si mañana no hay ninguna tarea A.
-  if (min >= 21 * 60 && min < 23 * 60) {
+  // «Tráguese ese sapo»: planificar la noche anterior. De 22:15 a 23:15 (después del «Plan Séneca» de Claude,
+  // que se prepara hacia las 21:50), si mañana sigue sin haber ninguna tarea A.
+  if (min >= 22 * 60 + 15 && min < 23 * 60 + 15) {
     const tomorrow = addDays(day, 1);
     if (!frogOf(itemsOn(items, tomorrow))) add(`frog:${tomorrow}`, '¿Cuál es tu sapo de mañana?', 'Elige esta noche la tarea más importante de mañana y márcala como A.');
   }
