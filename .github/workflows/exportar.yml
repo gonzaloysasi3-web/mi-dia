@@ -2,13 +2,21 @@ name: Exportar
 
 # Lo lanza la tarea programada de Claude «Plan Séneca» para leer el estado del usuario.
 # La petición va cifrada (notify/planificar.mjs pedir) y el estado sale cifrado con una clave temporal
-# que solo tiene esa sesión de Claude: en el log público solo se ve un bloque ilegible.
+# que solo tiene esa sesión de Claude. Se sube a la rama «exportar» (un solo commit que se sobrescribe):
+# en el repositorio público solo se ve un bloque ilegible.
 on:
   workflow_dispatch:
     inputs:
       datos:
         description: Petición cifrada
         required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: exportar
+  cancel-in-progress: false
 
 jobs:
   exportar:
@@ -24,3 +32,12 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           DATOS: ${{ inputs.datos }}
+      - name: Subir a la rama exportar
+        run: |
+          cd salida
+          git init -q -b exportar
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -qm "Exportación cifrada"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" exportar

@@ -27,7 +27,7 @@ HTML, CSS y JavaScript sin framework ni compilación. Los módulos ES se cargan 
 | `.github/workflows/publicar.yml` | Publica en Firebase Hosting al subir a `main` |
 | `.github/workflows/correo.yml` | Recibe el resumen de Gmail cifrado y lo guarda (`notify/correo.mjs`) |
 | `.github/workflows/importar.yml` | Mete datos cifrados en la cuenta del usuario (`notify/importar.mjs` + `notify/aplicar.mjs`): `{ email, add: { lista: [elementos con id fijo] }, patch: { items: [{ id, abc, rank, dur, date, time, tags }] }, plan }`. Así se cargó su horario desde una foto y así escribe el «Plan Séneca» |
-| `.github/workflows/exportar.yml` | Saca el estado cifrado con una clave temporal de Claude (`notify/exportar.mjs`) para que el «Plan Séneca» pueda leerlo |
+| `.github/workflows/exportar.yml` | Saca el estado cifrado con una clave temporal de Claude (`notify/exportar.mjs`) a la rama `exportar` para que el «Plan Séneca» pueda leerlo |
 
 ### Vistas
 
@@ -88,8 +88,8 @@ Si cambia la cuenta de servicio, vuelve a sacar la clave pública lanzando `corr
 ## Plan Séneca (planificación diaria con Claude)
 
 Tarea programada de Claude «Plan Séneca», cada noche a las 21:49 (Madrid). Planifica el día siguiente con el método del sapo:
-1. `node notify/planificar.mjs pedir <carpeta> <email>` crea una clave RSA temporal y cifra la petición; lanza `exportar.yml` con ella.
-2. Lee el log del job, `node notify/planificar.mjs leer <carpeta> <log>` lo descifra e imprime el resumen del día a planificar.
+1. `node notify/planificar.mjs pedir <carpeta> <email>` crea una clave RSA temporal y un id, y cifra la petición; lanza `exportar.yml` con ella.
+2. El workflow sube el estado cifrado a `<id>.caja` en la rama `exportar` (un único commit que se sobrescribe; el log no sirve porque el proxy de Claude no deja descargarlo). `node notify/planificar.mjs leer <carpeta>` hace `git fetch`, lo descifra e imprime el resumen del día a planificar (código 2 si aún no está).
 3. Escribe `plan.json` (tareas nuevas con id `plan-AAAA-MM-DD-n` y etiqueta `plan`, cambios ABCDE/fecha en tareas existentes y el texto del plan), `node notify/planificar.mjs enviar <carpeta> plan.json` lo comprueba (rangos A sin repetir, ids existentes) y lo cifra; lanza `importar.yml`.
 4. `users/{uid}.plan = { at, date, text, points[], frog }` llega por `hooks.plan` (`midia.dayplan`) y sale como tarjeta «Plan de hoy/mañana» en Inicio y Hoy (`planHtml()`, la variable es `DAYPLAN`: `PLAN` ya es el plan de estudio). Avisa al móvil.
 

@@ -1,14 +1,16 @@
 // Herramienta de la tarea programada de Claude «Plan Séneca» (planifica el día siguiente cada noche).
 //   node notify/planificar.mjs pedir  <carpeta> <email>        → crea una clave temporal en <carpeta> e imprime
 //                                                               la petición cifrada para el workflow Exportar
-//   node notify/planificar.mjs leer   <carpeta> <log> [fecha]   → saca el bloque cifrado del log de Exportar, lo abre,
+//   node notify/planificar.mjs leer   <carpeta> [fecha]         → baja la rama «exportar» (git fetch), abre su respuesta,
 //                                                               guarda <carpeta>/estado.json e imprime el resumen
-//                                                               del día a planificar (por defecto, mañana)
+//                                                               del día a planificar (por defecto, mañana).
+//                                                               Si aún no está, sale con código 2: espera y repite
 //   node notify/planificar.mjs enviar <carpeta> <plan.json>     → comprueba el plan e imprime los datos cifrados
 //                                                               para el workflow Importar
 // plan.json = { email, date, add: { items: [...] }, patch: { items: [...] }, plan: { date, text, points[], frog } }
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { abrir, cerrar } from './caja.mjs';
 import { addDays, parse } from '../dates.js';
 import { itemsOn, classesOn, abcOf, abcLabel, abcCmp, frogOf, WEEKDAYS } from '../quick.js';
@@ -24,16 +26,24 @@ if (cmd === 'pedir') {
   if (!arg) fail('Falta el email.');
   mkdirSync(dir, { recursive: true });
   const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 3072 });
+  const id = randomBytes(10).toString('hex');
   writeFileSync(`${dir}/clave.pem`, privateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o600 });
-  process.stdout.write(cerrar({ email: arg, llave: publicKey.export({ type: 'spki', format: 'pem' }) }, readFileSync(PUB)));
+  writeFileSync(`${dir}/id`, id);
+  process.stdout.write(cerrar({ email: arg, id, llave: publicKey.export({ type: 'spki', format: 'pem' }) }, readFileSync(PUB)));
 } else if (cmd === 'leer') {
-  // Cada línea del log puede llevar delante la hora de GitHub: el bloque es la última palabra de cada línea
-  const log = readFileSync(arg, 'utf8').split('\n').map((l) => l.trim().split(/\s+/).pop());
-  const a = log.findIndex((l) => l === 'SENECA-INICIO'), z = log.findIndex((l) => l === 'SENECA-FIN');
-  if (a < 0 || z < a) fail('No encuentro el bloque cifrado en el log.');
-  const data = abrir(log.slice(a + 1, z).join(''), readFileSync(`${dir}/clave.pem`));
+  const id = readFileSync(`${dir}/id`, 'utf8').trim();
+  const git = (...a) => execFileSync('git', a, { cwd: new URL('..', import.meta.url), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  let raw;
+  try {
+    git('fetch', '-q', 'origin', '+refs/heads/exportar:refs/remotes/origin/exportar');
+    raw = git('show', `origin/exportar:${id}.caja`);
+  } catch {
+    console.error('Aún no está la respuesta del workflow Exportar. Espera unos segundos y repite.');
+    process.exit(2);
+  }
+  const data = abrir(raw.trim(), readFileSync(`${dir}/clave.pem`));
   writeFileSync(`${dir}/estado.json`, JSON.stringify(data, null, 1));
-  console.log(digest(data, arg2));
+  console.log(digest(data, arg));
 } else if (cmd === 'enviar') {
   const p = JSON.parse(readFileSync(arg, 'utf8'));
   const { state } = JSON.parse(readFileSync(`${dir}/estado.json`, 'utf8'));
