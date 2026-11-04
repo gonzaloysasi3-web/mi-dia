@@ -72,7 +72,8 @@ if (cmd === 'pedir') {
   // Ninguna tarea con hora puede pisar una cita, examen o clase de ese día (las citas sin fin cuentan 60 min)
   const mins = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
   const D = p.plan?.date;
-  const fixed = [...itemsOn((state.items || []).filter((i) => i.type !== 'task'), D), ...classesOn(state.classes || [], D)]
+  // plan.skipClasses: ese día no va a clase (p. ej. se queda en la biblioteca), así que las clases no cuentan
+  const fixed = [...itemsOn((state.items || []).filter((i) => i.type !== 'task'), D), ...(p.plan?.skipClasses ? [] : classesOn(state.classes || [], D))]
     .filter((i) => i.time).map((i) => ({ t: i.title, a: mins(i.time), z: i.end ? mins(i.end) : mins(i.time) + 60 }));
   for (const x of all.filter((i) => i.type === 'task' && i.date === D && i.time && !i.done)) {
     const a = mins(x.time), z = a + (x.dur || 30);
