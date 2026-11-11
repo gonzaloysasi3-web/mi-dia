@@ -20,7 +20,7 @@ const mondayOf = (s) => addDays(s, -((parse(s).getDay() + 6) % 7));
 
 /* ---------- Estado (local primero; la sincronización es opcional) ---------- */
 const uid = () => crypto.randomUUID?.() ?? Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-const LISTS = ['items', 'habits', 'focus', 'counters', 'library', 'wallet', 'classes'];
+const LISTS = ['items', 'habits', 'focus', 'counters', 'library', 'wallet', 'classes', 'accounts'];
 const empty = () => Object.fromEntries(LISTS.map((k) => [k, []]));
 
 function load() {
@@ -441,6 +441,34 @@ function focusChart() {
       <span class="hname">${esc(l)}</span><span class="track"><span class="fill" style="width:${Math.round((m / rows[0][1]) * 100)}%"></span></span><span class="hpct">${hm(m)}</span></div>`).join('')}</div>`;
 }
 
+/* ---------- Widgets de Inicio (estilo iPhone): cada uno abre su apartado ---------- */
+function widgetsHtml({ t, todays, pending, exams, habits, habitsDone, items, wk }) {
+  const W = (v, ic, name, body, cls = '') => `<button type="button" class="wg ${cls}" data-act="go" data-view="${v}" aria-label="${name}">
+    <span class="wg-h">${icon(ic)}${name}</span>${body}</button>`;
+  const nx = todays.filter((i) => !i.done && i.time && i.time >= nowHM()).sort(sortDay)[0];
+  const hoy = W('hoy', 'hoy', 'Hoy', `<b class="wg-big" ${cu(pending)}>${pending}</b><span class="wg-s">${pending === 1 ? 'por hacer' : 'por hacer'}</span>
+    <span class="wg-foot">${nx ? `${nx.time} · ${esc(nx.title)}` : todays.length ? 'Nada más con hora' : 'Día libre'}</span>`);
+  const ex = exams[0];
+  const exD = ex ? diffDays(ex.date, t) : 0, exS = ex?.subs || [];
+  const exam = W('examenes', 'exam', 'Examen', ex ? `<b class="wg-big"><span ${cu(exD)}>${exD}</span><small>${exD === 1 ? ' día' : ' días'}</small></b>
+    <span class="wg-s">${esc(ex.title)}</span>${exS.length ? `<span class="wg-bar"><span style="width:${Math.round((exS.filter((s) => s.done).length / exS.length) * 100)}%"></span></span>` : `<span class="wg-foot">${cap(fShort(ex.date))}</span>`}`
+    : '<b class="wg-big">–</b><span class="wg-s">Sin exámenes</span>', ex && exD <= 3 ? 'hot' : '');
+  const hp = habits.length ? Math.round((habitsDone / habits.length) * 100) : 0;
+  const hab = W('habitos', 'habitos', 'Hábitos', `<span class="wg-ring"><svg viewBox="0 0 42 42" aria-hidden="true"><circle class="r-track" cx="21" cy="21" r="17"/>${hp ? `<circle class="r-val" cx="21" cy="21" r="17" pathLength="100" stroke-dasharray="${hp} 100"/>` : ''}</svg><b>${habitsDone}<small>/${habits.length}</small></b></span>
+    <span class="wg-foot">${habits.length ? (habitsDone === habits.length ? 'Todos hechos' : 'hechos hoy') : 'Sin hábitos'}</span>`);
+  const accs = accounts();
+  const months = Array.from({ length: 6 }, (_, k) => monthAdd(t.slice(0, 7), k - 5));
+  let cum = 0; const sv = months.map((m) => (cum += walletTotals(m).bal));
+  const money = accs.length ? totalBalance() : walletTotals(t.slice(0, 7)).bal;
+  const wal = W('cartera', 'wallet', 'Cartera', `<b class="wg-big wg-money" ${money > 0 ? cu(money, 'eur') : ''}>${eur(money)}</b><span class="wg-s">${accs.length ? `${plural(accs.length, ['cuenta', 'cuentas'])}` : 'Saldo del mes'}</span>${spark(sv, 'sp-acc')}`);
+  const days = [0, 1, 2, 3, 4, 5, 6].map((k) => addDays(wk, k)), cnt = days.map((d) => dayItems(items, d).filter((i) => i.type !== 'class').length), mx = Math.max(1, ...cnt);
+  const week = W('semana', 'semana', 'Semana', `<span class="wg-bars">${days.map((d, k) => `<span class="${d === t ? 'now' : ''}"><i style="height:${Math.max(6, Math.round((cnt[k] / mx) * 76))}%"></i><small>${fNarrow(d).toUpperCase()}</small></span>`).join('')}</span>`);
+  const now = live(state.library).filter((x) => x.status === 'now').sort((x, y) => y.u - x.u)[0];
+  const lib = W('biblioteca', 'library', now?.kind === 'game' ? 'Jugando' : 'Leyendo', now ? `<span class="wg-s wg-title">${esc(now.title)}</span>${now.by ? `<span class="wg-foot">${esc(now.by)}</span>` : ''}
+    <span class="wg-bar"><span style="width:${libPct(now)}%"></span></span><span class="wg-foot">${libPct(now)} %</span>` : '<span class="wg-s">Nada empezado</span>');
+  return `<nav class="widgets" aria-label="Apartados">${hoy}${exam}${hab}${wal}${week}${lib}</nav>`;
+}
+
 function viewInicio() {
   const t = today(), now = nowHM();
   const items = live(state.items);
@@ -497,9 +525,7 @@ function viewInicio() {
   const nowLib = live(state.library).filter((x) => x.status === 'now').sort((x, y) => y.u - x.u).slice(0, 4);
   const html = `${sunday ? `<div class="banner"><p>Es domingo: buen momento para tu revisión semanal.</p><button type="button" class="text-btn" data-act="go" data-view="revision">Abrir revisión</button></div>` : ''}
     ${hero}
-    <nav class="tiles" aria-label="Apartados">${tiles.map(([v, ic, name, sum]) => `
-      <button type="button" class="tile" data-act="go" data-view="${v}">${icon(ic)}<span class="tile-name">${name}</span><span class="tile-sum">${sum}</span></button>`).join('')}
-    </nav>
+    ${widgetsHtml({ t, todays, pending, exams, habits, habitsDone, items, wk })}
     <div class="dash"><div class="dash-col">
       ${frogHtml()}
       ${planHtml()}
@@ -886,27 +912,161 @@ function walletSummary() {
 
 function walletRow(x) {
   const sign = x.kind === 'in' ? '+' : '−';
-  const meta = [cap(fShort(x.day)), esc(x.cat), x.monthly ? 'Cada mes' : ''].filter(Boolean).join(' · ');
+  const ac = x.acct && (state.accounts || []).find((y) => y.id === x.acct && !y.del);
+  const meta = [cap(fShort(x.day)), esc(x.cat), ac ? esc(ac.name) : '', x.monthly ? 'Cada mes' : ''].filter(Boolean).join(' · ');
   return `<li class="row notime"><span class="lead w-${x.kind}">${icon(x.kind === 'in' ? 'plus' : 'minus')}</span>
     <button type="button" class="body" data-act="walledit" data-id="${x.id}"><span class="title">${esc(x.title || x.cat)}</span><span class="meta">${meta}</span></button>
     <b class="w-amt ${x.kind}">${sign}${eur(x.amount)}</b></li>`;
 }
 
-function viewCartera() {
-  const { xs, inc, exp } = walletTotals(walMonth);
+/* ---------- Cuentas: tarjetas apiladas (BBVA, Trade Republic, Revolut…) ---------- */
+// cuenta = { name, type: 'bank'|'invest'|'card', style: 'bbva'|'tr'|'revolut'|'navy', last4, base, baseDate }
+// Saldo = base (lo que escribió el usuario en baseDate) + movimientos de esa cuenta desde entonces hasta hoy.
+const ACC_TYPE = { bank: 'Cuenta', invest: 'Inversión', card: 'Tarjeta' };
+const ACC_PRESET = { bbva: { name: 'BBVA', type: 'bank' }, tr: { name: 'Trade Republic', type: 'invest' }, revolut: { name: 'Revolut', type: 'card' }, navy: { name: '', type: 'bank' } };
+let cardTop = 0;
+const accounts = () => live(state.accounts || []).sort((x, y) => (x.ord ?? 0) - (y.ord ?? 0) || x.u - y.u);
+const monthsBetween = (from, to) => { const out = []; let [y, m] = from.split('-').map(Number); const [y2, m2] = to.split('-').map(Number); while (y < y2 || (y === y2 && m <= m2)) { out.push(`${y}-${pad(m)}`); m++; if (m > 12) { m = 1; y++; } } return out; };
+function accMoves(acc, from = acc.baseDate, to = today()) {
+  const xs = [];
+  for (const ym of monthsBetween(from.slice(0, 7), to.slice(0, 7))) for (const x of walletMonth(ym)) if (x.acct === acc.id && x.day > from && x.day <= to) xs.push(x);
+  return xs;
+}
+const net = (xs) => r2(xs.reduce((s, x) => s + (x.kind === 'in' ? x.amount : -x.amount), 0));
+const accBalance = (acc) => r2((acc.base || 0) + net(accMoves(acc)));
+const totalBalance = () => r2(accounts().reduce((s, a) => s + accBalance(a), 0));
+
+function bankCard(acc, k, n) {
+  const bal = accBalance(acc);
+  const ym = today().slice(0, 7), mv = accMoves(acc, `${ym}-00`);
+  const inc = r2(mv.filter((x) => x.kind === 'in').reduce((s, x) => s + x.amount, 0)), exp = r2(mv.filter((x) => x.kind === 'out').reduce((s, x) => s + x.amount, 0));
+  return `<div class="bank-card s-${esc(acc.style || 'navy')}" style="--k:${k}" data-k="${k}" data-id="${acc.id}" ${k === 0 ? 'tabindex="0" role="button" aria-label="' + esc(acc.name) + ', ' + eur(bal) + '. Pulsa para darle la vuelta"' : 'aria-hidden="true"'}>
+    <div class="bc-face bc-front">
+      <div class="bc-top"><span class="bc-name">${esc(acc.name)}</span>${icon('nfc')}</div>
+      <span class="bc-chip" aria-hidden="true"></span>
+      <div class="bc-bal"><span>${ACC_TYPE[acc.type] || 'Cuenta'}</span><b ${k === 0 ? cu(bal, 'eur') : ''}>${eur(bal)}</b></div>
+      <div class="bc-foot"><span>${acc.last4 ? `•••• ${esc(acc.last4)}` : ''}</span><span>${k + 1}/${n}</span></div>
+    </div>
+    <div class="bc-face bc-back">
+      <div class="bc-top"><span class="bc-name">${esc(acc.name)}</span><span class="bc-small">${cap(fMonth(ym))}</span></div>
+      <dl class="bc-dl"><div><dt>Saldo</dt><dd>${eur(bal)}</dd></div><div><dt>Entra</dt><dd>+${eur(inc)}</dd></div><div><dt>Sale</dt><dd>−${eur(exp)}</dd></div></dl>
+      <div class="bc-acts">
+        <button type="button" data-act="accmove" data-id="${acc.id}">${icon('plus')}Movimiento</button>
+        <button type="button" data-act="accedit" data-id="${acc.id}">${icon('pencil')}Editar</button>
+      </div>
+    </div>
+  </div>`;
+}
+function cardsHtml() {
+  const accs = accounts();
+  if (!accs.length) return `<section class="cards-empty">
+      <div class="card-stack demo" aria-hidden="true">${['revolut', 'tr', 'bbva'].map((s, k) => `<div class="bank-card s-${s}" style="--k:${2 - k}"><div class="bc-face bc-front"><div class="bc-top"><span class="bc-name">${ACC_PRESET[s].name}</span>${icon('nfc')}</div><span class="bc-chip"></span></div></div>`).join('')}</div>
+      <div class="cards-cta"><p class="cards-h">Tus cuentas, como en la cartera del móvil</p><p class="note">Añade cada cuenta con su saldo y apunta en ella los movimientos.</p>
+      <div class="chips">${Object.entries(ACC_PRESET).map(([k, v]) => `<button type="button" class="chip" data-act="accnew" data-style="${k}">${icon('plus')}${v.name || 'Otra'}</button>`).join('')}</div></div>
+    </section>`;
+  cardTop = ((cardTop % accs.length) + accs.length) % accs.length;
+  const ring = accs.map((_, k) => accs[(cardTop + k) % accs.length]);
+  return `<section class="cards" aria-label="Cuentas">
+    <div class="cards-head"><div><p class="hero-k">Patrimonio</p><p class="cards-total" ${cu(totalBalance(), 'eur')}>${eur(totalBalance())}</p></div>
+      <button type="button" class="mini-btn" data-act="accnew">${icon('plus')}Cuenta</button></div>
+    <div class="card-stack" data-n="${accs.length}">${ring.slice(0, 4).map((acc, k) => bankCard(acc, k, accs.length)).reverse().join('')}</div>
+    <div class="cards-nav">
+      <button type="button" class="icon-btn" data-act="cardnav" data-d="-1" aria-label="Cuenta anterior">${icon('prev')}</button>
+      <span class="cards-dots" aria-hidden="true">${accs.map((_, k) => `<i${k === cardTop ? ' class="on"' : ''}></i>`).join('')}</span>
+      <button type="button" class="icon-btn" data-act="cardnav" data-d="1" aria-label="Cuenta siguiente">${icon('next')}</button>
+    </div>
+    <p class="cards-hint">Desliza la tarjeta para ver la siguiente, o tócala para darle la vuelta.</p>
+  </section>`;
+}
+
+/* ---------- Gráficas de la cartera ---------- */
+const monthAdd = (ym, n) => ymd(new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1 + n, 1)).slice(0, 7);
+function spark(vals, cls) {
+  const w = 100, h = 28, max = Math.max(...vals), min = Math.min(...vals), span = max - min || 1;
+  const pts = vals.map((v, k) => [(k / Math.max(1, vals.length - 1)) * w, h - 3 - ((v - min) / span) * (h - 6)]);
+  const d = pts.map((p, k) => `${k ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join('');
+  return `<svg class="spark ${cls}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><path class="sp-area" d="${d}L${w} ${h}L0 ${h}Z"/><path class="sp-line" d="${d}" pathLength="100"/></svg>`;
+}
+function statCards(ym) {
+  const months = Array.from({ length: 6 }, (_, k) => monthAdd(ym, k - 5)), T = months.map(walletTotals);
+  const cur = T[5], prev = T[4];
+  const card = (label, key, val, cls, goodUp) => {
+    const p = prev[key], d = p ? Math.round(((val - p) / Math.abs(p)) * 100) : null;
+    const good = d === null ? null : goodUp ? d >= 0 : d <= 0;
+    return `<div class="stat"><span class="stat-k">${label}</span><b class="stat-v" ${val > 0 ? cu(val, 'eur') : ''}>${eur(val)}</b>
+      ${d === null ? '<span class="delta">sin mes anterior</span>' : `<span class="delta ${good ? 'good' : 'bad'}">${d >= 0 ? '↑' : '↓'} ${Math.abs(d)} % <small>vs ${fMonth(months[4]).split(' ')[0]}</small></span>`}
+      ${spark(T.map((t) => t[key]), cls)}</div>`;
+  };
+  return `<div class="stats-row">${card('Ingresos', 'inc', cur.inc, 'sp-in', true)}${card('Gastos', 'exp', cur.exp, 'sp-out', false)}${card('Ahorro', 'bal', cur.bal, 'sp-acc', true)}</div>`;
+}
+// Área interactiva: ahorro acumulado mes a mes (o patrimonio si hay cuentas). Se recorre con el dedo o el ratón.
+let areaRange = Number(getPref('areaRange', '6'));
+function areaChart(ym) {
+  const months = Array.from({ length: areaRange }, (_, k) => monthAdd(ym, k - areaRange + 1));
+  const hasAcc = accounts().length > 0;
+  let vals;
+  if (hasAcc) { // patrimonio al final de cada mes: total de hoy menos todo lo que entró y salió después
+    const tot = totalBalance(), t = today();
+    vals = months.map((m) => {
+      const from = monthAdd(m, 1);
+      const after = from > t.slice(0, 7) ? [] : monthsBetween(from, t.slice(0, 7)).flatMap((ym) => walletMonth(ym)).filter((x) => x.day <= t);
+      return r2(tot - net(after));
+    });
+  } else { let acc = 0; vals = months.map((m) => (acc = r2(acc + walletTotals(m).bal))); }
+  const W = 320, H = 140, P = 6, max = Math.max(...vals, 0), min = Math.min(...vals, 0), span = max - min || 1;
+  const X = (k) => P + (k / Math.max(1, months.length - 1)) * (W - 2 * P), Y = (v) => P + (1 - (v - min) / span) * (H - 2 * P - 14);
+  const pts = vals.map((v, k) => [X(k), Y(v)]);
+  // curva suave (Catmull-Rom a Bézier)
+  let d = `M${pts[0][0]} ${pts[0][1]}`;
+  for (let k = 0; k < pts.length - 1; k++) {
+    const p0 = pts[k - 1] || pts[k], p1 = pts[k], p2 = pts[k + 1], p3 = pts[k + 2] || p2;
+    d += `C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)} ${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)} ${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  const first = vals[0], last = vals.at(-1), ch = r2(last - first);
+  const data = months.map((m, k) => ({ x: pts[k][0] / W, y: pts[k][1] / H, l: cap(fMonth(m)), v: eur(vals[k]) }));
+  return `<div class="group chart area-card">
+    <div class="area-head"><div><span class="stat-k">${hasAcc ? 'Patrimonio' : 'Ahorro acumulado'}</span><b class="stat-v">${eur(last)}</b>
+      <span class="delta ${ch >= 0 ? 'good' : 'bad'}">${ch >= 0 ? '↑' : '↓'} ${eur(Math.abs(ch))} <small>en ${areaRange} meses</small></span></div>
+      <div class="tabs mini" role="group" aria-label="Periodo">${[6, 12].map((n) => `<button type="button" data-act="arearange" data-n="${n}" aria-pressed="${areaRange === n}">${n} M</button>`).join('')}</div></div>
+    <div class="area" data-pts='${esc(JSON.stringify(data))}' role="img" aria-label="${hasAcc ? 'Patrimonio' : 'Ahorro acumulado'}: ${data.map((p) => `${p.l} ${p.v}`).join(', ')}">
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+        <defs><linearGradient id="agrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity="0.32"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
+        <path class="a-fill" d="${d}L${pts.at(-1)[0]} ${H}L${pts[0][0]} ${H}Z" fill="url(#agrad)"/><path class="a-line" d="${d}" pathLength="100"/>
+      </svg>
+      <span class="a-cursor" hidden></span><span class="a-dot" hidden></span><span class="a-tip" hidden></span>
+    </div>
+    <div class="a-x">${months.map((m, k) => (k % (areaRange > 6 ? 2 : 1) === 0 || k === months.length - 1 ? `<span style="left:${(pts[k][0] / W) * 100}%">${fMonth(m).slice(0, 3)}</span>` : '')).join('')}</div>
+  </div>`;
+}
+function catDonut(ym) {
+  const { xs, exp } = walletTotals(ym);
   const cats = {};
   for (const x of xs) if (x.kind === 'out') cats[x.cat] = r2((cats[x.cat] || 0) + x.amount);
-  const top = Object.entries(cats).sort((a, b) => b[1] - a[1]);
-  let html = `<div class="w-month">
+  const top = Object.entries(cats).sort((p, q) => q[1] - p[1]);
+  if (!top.length) return '';
+  const rows = top.length > 7 ? [...top.slice(0, 6), ['Resto', r2(top.slice(6).reduce((s, x) => s + x[1], 0))]] : top;
+  let off = 0;
+  const segs = rows.map(([c, v], k) => { const len = (v / exp) * 100, g = Math.min(1.2, len / 3); const s = `<circle class="cd-seg" data-k="${k}" style="--c:var(--t${k})" cx="21" cy="21" r="15.915" pathLength="100" stroke-dasharray="${Math.max(0.1, len - g)} ${100 - len + g}" stroke-dashoffset="${-off}"/>`; off += len; return s; }).join('');
+  return `<h2 class="sec">Gastos por categoría</h2><div class="group chart cat-card">
+    <div class="cat-wrap"><svg class="donut cat-donut" viewBox="0 0 42 42" role="img" aria-label="Gastos por categoría: ${rows.map(([c, v]) => `${esc(c)} ${eur(v)}`).join(', ')}">
+      <circle class="d-track" cx="21" cy="21" r="15.915"/>${segs}
+      <text x="21" y="20" class="d-lbl">Gastado</text><text x="21" y="25.5" class="d-val">${eur(exp)}</text></svg>
+    <ul class="cat-list">${rows.map(([c, v], k) => `<li data-k="${k}" tabindex="0"><i style="background:var(--t${k})"></i><span>${esc(c)}</span><b>${eur(v)}</b><small>${Math.round((v / exp) * 100)} %</small></li>`).join('')}</ul></div>
+    <div class="split" aria-hidden="true">${rows.map(([, v], k) => `<span style="flex:${v};background:var(--t${k})"></span>`).join('')}</div>
+  </div>`;
+}
+
+function viewCartera() {
+  const { xs, inc, exp } = walletTotals(walMonth);
+  let html = cardsHtml() + `<div class="w-month">
     <button type="button" class="icon-btn" data-act="walmonth" data-d="-1" aria-label="Mes anterior">${icon('prev')}</button>
     <h2>${cap(fMonth(walMonth))}</h2>
     <button type="button" class="icon-btn" data-act="walmonth" data-d="1" aria-label="Mes siguiente">${icon('next')}</button>
     ${walMonth !== today().slice(0, 7) ? `<button type="button" class="text-btn" data-act="walmonth" data-d="0">Este mes</button>` : ''}
   </div>
-  <div class="group chart">${walletDonut(walMonth)}</div>`;
-  if (top.length) html += `<h2 class="sec">Gastos por categoría</h2><div class="group chart">${top.map(([c, v]) => `
-    <div class="hbar wide-val" tabindex="0" aria-label="${esc(c)}: ${eur(v)}">
-      <span class="hname">${esc(c)}</span><span class="track"><span class="fill w-fill" style="width:${Math.round((v / top[0][1]) * 100)}%"></span></span><span class="hpct">${eur(v)}</span></div>`).join('')}</div>`;
+  ${statCards(walMonth)}
+  ${areaChart(walMonth)}
+  ${catDonut(walMonth)}`;
   html += `<h2 class="sec">Movimientos</h2>` + (xs.length ? `<ul class="group">${xs.map(walletRow).join('')}</ul>`
     : `<div class="group empty"><p>No hay movimientos este mes.</p></div>`);
   html += `<button type="button" class="btn lib-add" data-act="walnew">${icon('plus')}Añadir movimiento</button>
@@ -952,6 +1112,7 @@ async function onWalletImport(e) {
 const walDlg = $('#walSheet');
 const walForm = $('#walForm');
 let walEditing = null;
+let walAcct = null; // cuenta preseleccionada al añadir desde una tarjeta
 function walCats(kind, sel) {
   walForm.cat.innerHTML = WCATS[kind].map((c) => `<option>${esc(c)}</option>`).join('');
   walForm.cat.value = WCATS[kind].includes(sel) ? sel : WCATS[kind][0];
@@ -967,6 +1128,11 @@ function openWallet(x) {
   walForm.title.value = x?.title || '';
   walForm.date.value = x?.date || (walMonth === today().slice(0, 7) ? today() : `${walMonth}-01`);
   walForm.monthly.checked = !!x?.monthly;
+  const accs = accounts();
+  $('#fldAcct').hidden = !accs.length;
+  walForm.acct.innerHTML = `<option value="">Sin cuenta</option>` + accs.map((y) => `<option value="${y.id}">${esc(y.name)}</option>`).join('');
+  walForm.acct.value = x?.acct && accs.some((y) => y.id === x.acct) ? x.acct : (walAcct || '');
+  walAcct = null;
   $('#walDel').hidden = !x;
   walDlg.showModal();
   if (!x) walForm.amount.focus();
@@ -979,6 +1145,7 @@ walForm.addEventListener('submit', (e) => {
   if (!(amount > 0)) { walForm.amount.focus(); return toast('Escribe un importe mayor que 0.'); }
   const x = walEditing ? { ...walEditing } : { id: uid() };
   Object.assign(x, { kind: f.get('kind'), amount, title: String(f.get('title')).trim(), cat: f.get('cat'), date: f.get('date') || today(), monthly: f.get('monthly') === 'on' });
+  if (f.get('acct')) x.acct = f.get('acct'); else delete x.acct;
   upsert(state.wallet, x);
   walDlg.close();
   commit();
@@ -989,6 +1156,100 @@ $('#walDel').addEventListener('click', () => {
   remove(state.wallet, x, 'Movimiento eliminado');
 });
 walDlg.addEventListener('click', (e) => { if (e.target === walDlg || e.target.closest('[data-close]')) walDlg.close(); });
+
+const accDlg = $('#accSheet');
+const accForm = $('#accForm');
+let accEditing = null;
+function accPreview() {
+  const f = new FormData(accForm);
+  const fake = { id: 'p', name: String(f.get('name') || '').trim() || ACC_PRESET[f.get('style')]?.name || 'Cuenta', type: f.get('type'), style: f.get('style'), last4: String(f.get('last4') || ''), base: parseFloat(String(f.get('balance') || '0').replace(',', '.')) || 0, baseDate: today() };
+  $('#accPreview').innerHTML = `<div class="card-stack solo">${bankCard(fake, 0, 1).replace(/ data-id="p"[^>]*role="button"[^>]*"/, '')}</div>`;
+}
+function openAccount(acc, style = 'bbva') {
+  accEditing = acc;
+  accForm.reset();
+  const st = acc?.style || style;
+  $('#accTitle').textContent = acc ? 'Editar cuenta' : 'Nueva cuenta';
+  accForm.style.value = st;
+  accForm.name.value = acc?.name ?? ACC_PRESET[st].name;
+  accForm.type.value = acc?.type || ACC_PRESET[st].type;
+  accForm.last4.value = acc?.last4 || '';
+  accForm.balance.value = acc ? String(accBalance(acc)).replace('.', ',') : '';
+  $('#accDel').hidden = !acc;
+  accPreview();
+  accDlg.showModal();
+  if (!acc) accForm.balance.focus();
+}
+accForm.addEventListener('input', accPreview);
+accForm.addEventListener('change', (e) => {
+  if (e.target.name === 'style' && !accEditing) {
+    const p = ACC_PRESET[e.target.value];
+    if (!accForm.name.value || Object.values(ACC_PRESET).some((v) => v.name === accForm.name.value)) accForm.name.value = p.name;
+    accForm.type.value = p.type;
+  }
+  accPreview();
+});
+accForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = new FormData(accForm);
+  const bal = r2(parseFloat(String(f.get('balance')).replace(',', '.')));
+  if (Number.isNaN(bal)) { accForm.balance.focus(); return toast('Escribe el saldo actual.'); }
+  const name = String(f.get('name')).trim();
+  if (!name) { accForm.name.focus(); return; }
+  const x = accEditing ? { ...accEditing } : { id: uid(), ord: accounts().length };
+  const last4 = String(f.get('last4') || '').replace(/\D/g, '').slice(-4);
+  Object.assign(x, { name, type: f.get('type'), style: f.get('style'), last4, base: bal, baseDate: today() });
+  upsert(state.accounts, x);
+  if (!accEditing) cardTop = accounts().findIndex((y) => y.id === x.id);
+  accDlg.close();
+  commit();
+});
+$('#accDel').addEventListener('click', () => {
+  const x = state.accounts.find((y) => y.id === accEditing.id);
+  accDlg.close();
+  remove(state.accounts, x, 'Cuenta eliminada');
+});
+accDlg.addEventListener('click', (e) => { if (e.target === accDlg || e.target.closest('[data-close]')) accDlg.close(); });
+
+// Tarjetas: arrastrar la de arriba la manda al fondo; tocarla le da la vuelta.
+let drag = null;
+$('#view').addEventListener('pointerdown', (e) => {
+  const c = e.target.closest('.card-stack:not(.demo):not(.solo) .bank-card[data-k="0"]');
+  if (!c || e.target.closest('button') || e.button > 0) return;
+  drag = { c, x: e.clientX, y: e.clientY, dx: 0, id: e.pointerId, t: performance.now() };
+  c.setPointerCapture(e.pointerId);
+  c.classList.add('dragging');
+});
+$('#view').addEventListener('pointermove', (e) => {
+  if (!drag || e.pointerId !== drag.id) return;
+  drag.dx = e.clientX - drag.x;
+  const dy = (e.clientY - drag.y) * 0.25;
+  drag.c.style.setProperty('--dx', `${drag.dx}px`);
+  drag.c.style.setProperty('--dy', `${dy}px`);
+  drag.c.style.setProperty('--rot', `${drag.dx / 18}deg`);
+});
+function endDrag(e) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const { c, dx } = drag; drag = null;
+  c.classList.remove('dragging');
+  const n = accounts().length;
+  if (Math.abs(dx) > 70 && n > 1) return throwCard(c, Math.sign(dx));
+  c.style.removeProperty('--dx'); c.style.removeProperty('--dy'); c.style.removeProperty('--rot');
+  if (Math.abs(dx) < 6) c.classList.toggle('flipped');
+}
+$('#view').addEventListener('pointerup', endDrag);
+$('#view').addEventListener('pointercancel', endDrag);
+$('#view').addEventListener('keydown', (e) => {
+  const c = e.target.closest?.('.bank-card[data-k="0"]');
+  if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); c.classList.toggle('flipped'); }
+});
+function throwCard(c, dir) {
+  const n = accounts().length;
+  if (calm() || !c) { cardTop += dir < 0 ? 1 : 1; return render(); }
+  c.classList.add('thrown');
+  c.style.setProperty('--dx', `${dir * 420}px`); c.style.setProperty('--rot', `${dir * 24}deg`);
+  setTimeout(() => { cardTop = (cardTop + 1) % n; render(); }, 260);
+}
 
 /* ---------- Resumen de correo (lo prepara una tarea programada de Claude a las 7:30 y a las 19:30) ---------- */
 const MAIL_P = { 2: 'Importante', 1: 'Para leer', 0: 'Puede esperar' };
@@ -1219,6 +1480,8 @@ function claudeSummary() {
     const days = Array.from({ length: 30 }, (_, n) => addDays(t, -n));
     L.push(...habits.map((x) => `- ${x.name}: ${x.log[t] ? 'hecho hoy' : 'pendiente hoy'} · racha ${streak(x)} días · ${days.filter((d) => x.log[d]).length}/30 días`));
   }
+  const accs = accounts();
+  if (accs.length) { h('Cuentas'); L.push(...accs.map((x) => `- ${x.name} (${ACC_TYPE[x.type] || 'Cuenta'}): ${eur(accBalance(x))}`), `- Total: ${eur(totalBalance())}`); }
   const { xs, inc, exp, bal } = walletTotals(t.slice(0, 7));
   if (xs.length) {
     h(`Cartera de ${fMonth(t.slice(0, 7))}`);
@@ -1487,6 +1750,36 @@ function render() {
   }
 }
 
+/* Gráfica de área: cursor que sigue al dedo o al ratón */
+function areaScrub(e) {
+  const box = e.target.closest?.('.area');
+  if (!box) return;
+  const pts = JSON.parse(box.dataset.pts), r = box.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width;
+  const p = pts.reduce((b, q) => (Math.abs(q.x - fx) < Math.abs(b.x - fx) ? q : b));
+  const [cur, dot, tip] = ['.a-cursor', '.a-dot', '.a-tip'].map((s) => box.querySelector(s));
+  cur.hidden = dot.hidden = tip.hidden = false;
+  cur.style.left = dot.style.left = `${p.x * 100}%`;
+  dot.style.top = `${p.y * 100}%`;
+  tip.textContent = '';
+  const b = document.createElement('b'); b.textContent = p.v; const s = document.createElement('span'); s.textContent = p.l;
+  tip.append(b, s);
+  tip.style.left = `${Math.min(Math.max(p.x * 100, 14), 86)}%`;
+}
+$('#view').addEventListener('pointermove', areaScrub);
+$('#view').addEventListener('pointerdown', areaScrub);
+$('#view').addEventListener('pointerleave', () => document.querySelectorAll('.area .a-cursor, .area .a-dot, .area .a-tip').forEach((el) => { el.hidden = true; }), true);
+// Leyenda de categorías: al pasar o tocar, se resalta su trozo
+function catHi(e) {
+  const li = e.target.closest?.('.cat-list li, .cd-seg');
+  const card = e.target.closest?.('.cat-card');
+  if (!card) return;
+  card.classList.toggle('hi', !!li);
+  card.querySelectorAll('[data-k]').forEach((el) => el.classList.toggle('on', !!li && el.dataset.k === li.dataset.k));
+}
+$('#view').addEventListener('pointerover', catHi);
+$('#view').addEventListener('focusin', catHi);
+$('#view').addEventListener('pointerout', (e) => { if (!e.relatedTarget?.closest?.('.cat-card')) e.target.closest?.('.cat-card')?.classList.remove('hi'); });
+
 /* ---------- Hoja de edición ---------- */
 const dlg = $('#sheet');
 const form = $('#form');
@@ -1740,7 +2033,7 @@ $('#focusBtn').addEventListener('click', () => {
 let toastTimer;
 function toast(msg, undo) {
   const el = $('#toast');
-  el.innerHTML = `<span>${esc(msg)}</span>${undo ? '<button type="button">Deshacer</button>' : ''}`;
+  el.innerHTML = `<span>${esc(msg)}</span>${undo ? '<button type="button">Deshacer</button><i class="toast-bar" aria-hidden="true"></i>' : ''}`;
   el.hidden = false;
   if (undo) el.querySelector('button').onclick = () => { undo(); el.hidden = true; };
   clearTimeout(toastTimer);
@@ -1761,6 +2054,11 @@ $('#view').addEventListener('click', (e) => {
   else if (act === 'libtab') { libTab = b.dataset.tab; setPref('libTab', libTab); render(); }
   else if (act === 'libnew') openLib(null);
   else if (act === 'walnew') openWallet(null);
+  else if (act === 'accnew') openAccount(null, b.dataset.style || 'bbva');
+  else if (act === 'accedit') openAccount(state.accounts.find((x) => x.id === id));
+  else if (act === 'accmove') { walAcct = id; openWallet(null); }
+  else if (act === 'cardnav') { const n = accounts().length; if (n < 2) return; if (b.dataset.d === '1') throwCard($('.bank-card[data-k="0"]'), 1); else { cardTop = (cardTop - 1 + n) % n; render(); } }
+  else if (act === 'arearange') { areaRange = Number(b.dataset.n); setPref('areaRange', areaRange); render(); }
   else if (act === 'claudecopy') copyClaude();
   else if (act === 'clsnew') openClass(null);
   else if (act === 'clsedit') openClass(state.classes.find((x) => x.id === id));
@@ -1911,11 +2209,11 @@ sync.start({
   },
 });
 
-setInterval(() => { if (!dlg.open && !libDlg.open && !['habitos', 'contadores', 'biblioteca', 'ajustes'].includes(view)) render(); }, 60000);
+setInterval(() => { if (!dlg.open && !libDlg.open && !accDlg.open && !walDlg.open && !['habitos', 'contadores', 'biblioteca', 'ajustes', 'cartera'].includes(view)) render(); }, 60000);
 setInterval(notifyCheck, 30000);
 setInterval(() => { if (gcalToken()) gcalFetch(); }, 15 * 60000);
 setTimeout(() => { notifyCheck(); if (gcalToken() && Date.now() - (gcalCache().at || 0) > 15 * 60000) gcalFetch(); }, 1500);
-document.addEventListener('visibilitychange', () => { if (!document.hidden && !dlg.open && !libDlg.open && !walDlg.open && !clsDlg.open) { render(); notifyCheck(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !dlg.open && !libDlg.open && !walDlg.open && !clsDlg.open && !accDlg.open) { render(); notifyCheck(); } });
 
 // Actualización automática: al volver a la app busca una versión nueva y, cuando se instala, recarga una vez.
 // Si hay una hoja abierta, espera a que se cierre para no perder lo que se está escribiendo.
@@ -1926,7 +2224,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   }).catch(() => {});
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadWorker) return;
-    const open = [dlg, libDlg, walDlg, clsDlg].find((d) => d.open);
+    const open = [dlg, libDlg, walDlg, clsDlg, accDlg].find((d) => d.open);
     if (open) open.addEventListener('close', () => location.reload(), { once: true });
     else location.reload();
   });

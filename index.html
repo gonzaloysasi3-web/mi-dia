@@ -27,6 +27,10 @@
     <symbol id="i-habitos" viewBox="0 0 24 24"><path d="m17 3 3 3-3 3M4 11V9a3 3 0 0 1 3-3h13M7 21l-3-3 3-3M20 13v2a3 3 0 0 1-3 3H4"/></symbol>
     <symbol id="i-event" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-card" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h4"/></symbol>
+    <symbol id="i-nfc" viewBox="0 0 24 24"><path d="M8.5 8.5a5 5 0 0 1 0 7M12 6a8.5 8.5 0 0 1 0 12M15.5 3.5a12 12 0 0 1 0 17"/></symbol>
+    <symbol id="i-flip" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.7M20 4v4.7h-4.7M20 12a8 8 0 0 1-13.7 5.6L4 15.3M4 20v-4.7h4.7"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16Z"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5.5 12.5 4.2 4.2L18.5 8"/></symbol>
     <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7.5 18a4.25 4.25 0 0 1-.7-8.45A6 6 0 0 1 18.2 10 4 4 0 0 1 17.5 18Z"/></symbol>
     <symbol id="i-prev" viewBox="0 0 24 24"><path d="m14.5 5-7 7 7 7"/></symbol>
@@ -250,12 +254,43 @@
       <label class="field"><span>Categoría</span><select name="cat"></select></label>
     </div>
     <label class="field"><span>Concepto (opcional)</span><input name="title" maxlength="120" enterkeyhint="done"></label>
+    <label class="field" id="fldAcct"><span>Cuenta</span><select name="acct"></select></label>
     <div class="two">
       <label class="field"><span>Día</span><input type="date" name="date" required></label>
       <label class="w-check"><input type="checkbox" name="monthly"><span>Se repite cada mes</span></label>
     </div>
     <div class="sheet-foot">
       <button type="button" id="walDel" class="danger" hidden><svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>Eliminar</button>
+      <button type="submit" class="btn">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="accSheet" aria-labelledby="accTitle">
+  <form id="accForm" method="dialog" autocomplete="off">
+    <div class="sheet-head">
+      <h2 id="accTitle">Nueva cuenta</h2>
+      <button type="button" class="text-btn" data-close>Cancelar</button>
+    </div>
+    <div class="acc-preview" id="accPreview" aria-hidden="true"></div>
+    <fieldset class="field">
+      <legend>Estilo de la tarjeta</legend>
+      <div class="acc-styles">
+        <label><input type="radio" name="style" value="bbva" checked><span class="sw-card s-bbva"></span><b>BBVA</b></label>
+        <label><input type="radio" name="style" value="tr"><span class="sw-card s-tr"></span><b>Trade Republic</b></label>
+        <label><input type="radio" name="style" value="revolut"><span class="sw-card s-revolut"></span><b>Revolut</b></label>
+        <label><input type="radio" name="style" value="navy"><span class="sw-card s-navy"></span><b>Otra</b></label>
+      </div>
+    </fieldset>
+    <label class="field"><span>Nombre</span><input name="name" maxlength="40" required placeholder="BBVA"></label>
+    <div class="two">
+      <label class="field"><span>Tipo</span><select name="type"><option value="bank">Cuenta</option><option value="invest">Inversión</option><option value="card">Tarjeta</option></select></label>
+      <label class="field"><span>Últimos 4 dígitos</span><input name="last4" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="0457"></label>
+    </div>
+    <label class="field"><span>Saldo actual (€)</span><input name="balance" inputmode="decimal" required placeholder="0,00"></label>
+    <p class="note">A partir de hoy, los movimientos que apuntes en esta cuenta suben o bajan el saldo. Si lo ves descuadrado, escribe aquí el saldo real.</p>
+    <div class="sheet-foot">
+      <button type="button" id="accDel" class="danger" hidden><svg class="i" aria-hidden="true"><use href="#i-trash"/></svg>Eliminar</button>
       <button type="submit" class="btn">Guardar</button>
     </div>
   </form>

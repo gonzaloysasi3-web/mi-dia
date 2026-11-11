@@ -1,5 +1,5 @@
 // Aplica al estado lo que trae notify/importar.mjs. Sin red: se puede probar con datos de ejemplo.
-const LISTS = ['items', 'habits', 'focus', 'counters', 'library', 'wallet', 'classes'];
+const LISTS = ['items', 'habits', 'focus', 'counters', 'library', 'wallet', 'classes', 'accounts'];
 const PATCHABLE = { items: ['abc', 'rank', 'dur', 'date', 'time', 'tags'] };
 const prioOf = (abc) => (abc === 'A' ? 2 : abc === 'B' ? 1 : 0);
 

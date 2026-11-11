@@ -1,4 +1,4 @@
-const CACHE = 'midia-v21';
+const CACHE = 'midia-v22';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'sync.js', 'dates.js', 'quick.js', 'firebase-config.js', 'manifest.webmanifest', 'fonts/outfit.woff2', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
