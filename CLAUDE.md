@@ -52,7 +52,9 @@ En Firestore todo va en el documento `users/{uid}`: el campo `state` (JSON del e
 
 ## Reglas al editar
 
-- Interfaz en español, estilo limpio tipo Apple, modo claro y oscuro automáticos. Fuente del sistema. Iconos SVG del sprite de `index.html` (sin emojis).
+- Interfaz en español, estilo limpio tipo Apple, modo claro y oscuro automáticos. El oscuro es azul marino (`--bg`, `--surface`), no negro ni verde: el usuario lo pidió así. Texto en la fuente del sistema; títulos y cifras grandes en Outfit (`--display`, `fonts/outfit.woff2`, autoalojada). Iconos SVG del sprite de `index.html` (sin emojis).
+- Botones principales, FAB y chips activos usan `--ink` (marino en claro, azul claro en oscuro); `--accent` queda para enlaces, casillas e iconos. La tarjeta «Tu día» de Inicio (`.hero`, anillo de tareas + hábitos, estudio y racha) es marina en los dos modos (`--navy-*`).
+- Movimiento (bloque «Movimiento» antes de `render()` y final de `styles.css`): la clase `enter` en `#main` solo se pone al cambiar de vista (entrada escalonada con desenfoque, barras y anillos que crecen, cifras con `cu(n, fmt)` que suben contando); un repintado normal no anima. `.nav-ind` es la pastilla que se desliza en la navegación, la de `.tabs` es un `::before` animado con FLIP, y `popId` marca lo recién tocado (casilla, hábito `hab:id`, contador `cnt:id`). Todo se apaga con `prefers-reduced-motion`.
 - Colores siempre desde los tokens de `styles.css`. Los colores de tipo (`--c-task`, `--c-event`, `--c-exam`) y de etiqueta (`--t0`…`--t7`) son una paleta validada para daltonismo: no los cambies sin volver a validarla.
 - Zonas táctiles de al menos 44 px. Textos de usuario siempre escapados con `esc()`; en tooltips, con `textContent`.
 - **Cada vez que cambies un archivo de la app, sube la versión de `CACHE` en `sw.js`** (`midia-vN`). Si no, los móviles siguen con la versión antigua. Con la versión subida, la app se actualiza sola: al volver a ella busca el `sw.js` nuevo y recarga una vez (si hay una hoja abierta, espera a que se cierre). Si añades un archivo que la app necesita, añádelo a `SHELL`.

@@ -288,7 +288,7 @@ function viewHoy() {
   if (habits.length) {
     html += `<h2 class="sec">Hábitos de hoy</h2><div class="chips">${habits.map((h) => {
       const on = !!h.log[t];
-      return `<button type="button" class="chip" aria-pressed="${on}" data-act="hab" data-id="${h.id}" data-date="${t}">${on ? icon('check') : ''}${esc(h.name)}</button>`;
+      return `<button type="button" class="chip${popId === `hab:${h.id}` ? ' pop' : ''}" aria-pressed="${on}" data-act="hab" data-id="${h.id}" data-date="${t}">${on ? icon('check') : ''}${esc(h.name)}</button>`;
     }).join('')}</div>`;
   }
   return { title: 'Hoy', sub: [fLong(t), bits.join(' · ')], html };
@@ -464,9 +464,39 @@ function viewInicio() {
   const h = new Date().getHours();
   const hello = h < 6 ? 'Buenas noches' : h < 14 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches';
 
+  // Tarjeta «Tu día»: anillo con las tareas de hoy y tres cifras
+  const tk = todays.filter((i) => i.type === 'task'), tkDone = tk.filter((i) => i.done).length;
+  const p = tk.length ? Math.round((tkDone / tk.length) * 100) : 0;
+  const soon = exams[0];
+  const studyMin = live(state.focus).filter((f) => f.date === t).reduce((s, f) => s + f.min, 0);
+  const streakN = frogStreak();
+  const nx = next.find((i) => i.time) || next[0];
+  const heroSub = nx ? `Siguiente${nx.time ? ` a las ${nx.time}` : ''}: ${nx.title}`
+    : soon ? `Examen de ${soon.title}: ${countLabel(soon.date).t.toLowerCase()}` : 'Nada más por hoy.';
+  const hero = `<section class="hero" aria-label="Tu día">
+      <div class="ring${tk.length && tkDone === tk.length ? ' full' : ''}" role="img" aria-label="${tkDone} de ${tk.length} tareas hechas">
+        <svg viewBox="0 0 42 42" aria-hidden="true"><circle class="r-track" cx="21" cy="21" r="18"/>${p ? `<circle class="r-val" cx="21" cy="21" r="18" pathLength="100" stroke-dasharray="${p} 100"/>` : ''}</svg>
+        <span class="ring-num"><span ${cu(tkDone)}>${tkDone}</span><small>/${tk.length}</small></span>
+      </div>
+      <div><p class="hero-k">Tu día</p>
+        <p class="hero-big">${!tk.length ? 'Sin tareas hoy' : tkDone === tk.length ? 'Todo hecho' : `${plural(tk.length - tkDone, ['tarea', 'tareas'])} por hacer`}</p>
+        <p class="hero-sub">${esc(heroSub)}</p></div>
+      <ul class="hero-stats">
+        <li><b>${habits.length ? `<span ${cu(habitsDone)}>${habitsDone}</span>/${habits.length}` : '–'}</b><span>Hábitos</span></li>
+        <li><b ${cu(studyMin, 'min')}>${studyMin ? hm(studyMin) : '0 min'}</b><span>Estudio hoy</span></li>
+        <li><b><span ${cu(streakN)}>${streakN}</span> ${streakN === 1 ? 'día' : 'días'}</b><span>Racha del sapo</span></li>
+      </ul>
+    </section>`;
+  const who = syncInfo.state === 'on' && syncInfo.name && !syncInfo.name.includes('@') ? syncInfo.name.split(' ')[0] : '';
+  const n = (tp) => todays.filter((i) => i.type === tp).length;
+  const parts = [n('task') && plural(n('task'), ['tarea', 'tareas']), n('class') && plural(n('class'), ['clase', 'clases']), n('event') && plural(n('event'), ['cita', 'citas']), n('exam') && plural(n('exam'), ['examen', 'exámenes'])].filter(Boolean);
+  const context = (parts.length ? `Hoy tienes ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} y ${parts.at(-1)}` : parts[0]}.` : 'Hoy no tienes nada planeado.')
+    + (soon && soon.date > t ? ` Examen de ${soon.title} ${countLabel(soon.date).t.toLowerCase()}.` : '');
+
   const sunday = parse(t).getDay() === 0;
   const nowLib = live(state.library).filter((x) => x.status === 'now').sort((x, y) => y.u - x.u).slice(0, 4);
   const html = `${sunday ? `<div class="banner"><p>Es domingo: buen momento para tu revisión semanal.</p><button type="button" class="text-btn" data-act="go" data-view="revision">Abrir revisión</button></div>` : ''}
+    ${hero}
     <nav class="tiles" aria-label="Apartados">${tiles.map(([v, ic, name, sum]) => `
       <button type="button" class="tile" data-act="go" data-view="${v}">${icon(ic)}<span class="tile-name">${name}</span><span class="tile-sum">${sum}</span></button>`).join('')}
     </nav>
@@ -497,7 +527,7 @@ function viewInicio() {
       <section class="p-hab" aria-labelledby="h-hab"><h2 class="sec" id="h-hab">Hábitos, últimos 30 días</h2>${habitsChart(habits)}</section>
       <section class="p-focus" aria-labelledby="h-focus"><h2 class="sec" id="h-focus">Estudio, últimos 7 días</h2>${focusChart()}</section>
     </div></div>`;
-  return { title: 'Inicio', sub: [`${hello}. ${cap(fLong(t))}.`], html };
+  return { title: who ? `${hello}, ${who}` : hello, sub: [cap(fLong(t)), context], html };
 }
 
 /* ---------- Hoy: bloques de tiempo ---------- */
@@ -692,7 +722,7 @@ function viewContadores() {
     return `<div class="counter">
       <div class="c-main">
         <span class="name">${esc(c.name)}</span>
-        <span class="c-val">${num0(Math.round(tot * 100) / 100)}${u}</span>
+        <span class="c-val${popId === `cnt:${c.id}` ? ' pop' : ''}">${num0(Math.round(tot * 100) / 100)}${u}</span>
         <span class="streak">Esta semana: ${num0(Math.round(week * 100) / 100)}${u}${c.goal ? ` · Meta ${num0(c.goal)}${u} (${pct} %)` : ''}</span>
         ${c.goal ? `<span class="prog-track c-goal" aria-hidden="true"><span style="width:${pct}%"></span></span>` : ''}
       </div>
@@ -840,11 +870,11 @@ function walletDonut(ym) {
   return `<div class="w-sum">
     <svg class="donut" viewBox="0 0 42 42" role="img" aria-label="Ingresos ${eur(inc)}, gastos ${eur(exp)}, saldo ${eur(bal)}">
       <circle class="d-track" cx="21" cy="21" r="15.915"/>${seg('d-in', a, 0)}${seg('d-out', tot ? 100 - a : 0, a)}
-      <text x="21" y="20" class="d-lbl">Saldo</text><text x="21" y="25.5" class="d-val">${eur(bal)}</text>
+      <text x="21" y="20" class="d-lbl">Saldo</text><text x="21" y="25.5" class="d-val" ${bal > 0 ? cu(bal, 'eur') : ''}>${eur(bal)}</text>
     </svg>
     <dl class="w-legend">
-      <div><dt><i class="w-dot in"></i>Ingresos</dt><dd>${eur(inc)}</dd></div>
-      <div><dt><i class="w-dot out"></i>Gastos</dt><dd>${eur(exp)}</dd></div>
+      <div><dt><i class="w-dot in"></i>Ingresos</dt><dd ${cu(inc, 'eur')}>${eur(inc)}</dd></div>
+      <div><dt><i class="w-dot out"></i>Gastos</dt><dd ${cu(exp, 'eur')}>${eur(exp)}</dd></div>
       <div class="w-bal"><dt>Saldo</dt><dd class="${bal < 0 ? 'neg' : ''}">${eur(bal)}</dd></div>
     </dl>
   </div>`;
@@ -1380,20 +1410,75 @@ $('#view').addEventListener('focusin', (e) => { if (e.target.dataset.tip) showTi
 $('#view').addEventListener('focusout', hideTip);
 addEventListener('scroll', hideTip, { passive: true });
 
+/* ---------- Movimiento ---------- */
+const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)';
+// Atributos para una cifra que sube contando al entrar en la vista: <b ${cu(12.5, 'eur')}>12,50 €</b>
+const cu = (n, fmt = '') => `data-cu="${n}"${fmt ? ` data-fmt="${fmt}"` : ''}`;
+const CU_FMT = { eur: (n) => eur(Math.round(n * 100) / 100), min: (n) => hm(Math.round(n)) };
+function countUp(root) {
+  if (calm()) return;
+  root.querySelectorAll('[data-cu]').forEach((el) => {
+    const to = Number(el.dataset.cu), fmt = CU_FMT[el.dataset.fmt] || ((n) => String(Math.round(n)));
+    if (!to) return;
+    const end = el.textContent, t0 = performance.now(), D = 750;
+    const step = (now) => {
+      if (!el.isConnected) return;
+      const k = Math.min(1, (now - t0) / D);
+      el.textContent = k < 1 ? fmt(to * (1 - (1 - k) ** 3)) : end;
+      if (k < 1) requestAnimationFrame(step);
+    };
+    el.textContent = fmt(0);
+    requestAnimationFrame(step);
+  });
+}
+// Resaltado de la barra de navegación: una sola pastilla que se desliza hasta el apartado actual
+const navInd = document.createElement('span');
+navInd.className = 'nav-ind still';
+navInd.setAttribute('aria-hidden', 'true');
+$('.nav').prepend(navInd);
+function placeNav(still) {
+  const b = $('.nav button[aria-current="page"]');
+  if (!b || !b.offsetWidth) { navInd.style.opacity = 0; return; }
+  const side = matchMedia('(min-width: 880px)').matches;
+  const w = side ? b.offsetWidth : Math.min(64, b.offsetWidth - 8), h = side ? b.offsetHeight : b.offsetHeight - 10;
+  navInd.classList.toggle('still', !!still || navInd.style.opacity === '0' || !navInd.style.width);
+  Object.assign(navInd.style, { opacity: 1, width: `${w}px`, height: `${h}px`, transform: `translate(${b.offsetLeft + (b.offsetWidth - w) / 2}px, ${b.offsetTop + (b.offsetHeight - h) / 2}px)` });
+}
+addEventListener('resize', () => placeNav(true));
+const tabRects = () => [...document.querySelectorAll('#view .tabs')].map((t) => t.querySelector('[aria-pressed="true"]')?.getBoundingClientRect());
+let shownView = null, enterTimer;
+
 function render() {
   const keep = document.activeElement?.dataset;
   PLAN = studyPlan(live(state.items));
   const v = (views[view] || viewHoy)();
+  const entering = view !== shownView, before = entering ? [] : tabRects();
   $('#title').textContent = v.title;
   $('#sub').innerHTML = [].concat(v.sub).map((s) => `<span>${esc(s)}</span>`).join('');
   $('#view').innerHTML = v.html;
   $('#main').classList.toggle('wide', view === 'inicio');
   hideTip();
-  document.title = v.title === 'Inicio' ? 'Séneca' : `${v.title} · Séneca`;
+  document.title = view === 'inicio' ? 'Séneca' : `${v.title} · Séneca`;
   document.querySelectorAll('.nav button').forEach((b) => {
     const on = b.dataset.view === view || (b.dataset.view === 'mas' && MORE_VIEWS.includes(view));
     if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
+  placeNav(shownView === null);
+  // Solo al cambiar de vista: entrada escalonada y cifras que suben. Un repintado normal no anima nada.
+  clearTimeout(enterTimer);
+  $('#main').classList.toggle('enter', entering);
+  if (entering) {
+    shownView = view;
+    enterTimer = setTimeout(() => $('#main').classList.remove('enter'), 1400);
+    countUp($('#view'));
+  } else if (!calm()) {
+    tabRects().forEach((r, k) => {
+      const dx = r && before[k] ? before[k].left - r.left : 0;
+      if (Math.abs(dx) > 1) document.querySelectorAll('#view .tabs')[k].querySelector('[aria-pressed="true"]')
+        .animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], { duration: 380, easing: EASE, pseudoElement: '::before' });
+    });
+  }
   document.querySelectorAll('.hm-wrap').forEach((el) => { el.scrollLeft = el.scrollWidth; });
   popId = null;
   if (keep?.act && (keep.id || keep.date)) {
@@ -1701,6 +1786,7 @@ $('#view').addEventListener('click', (e) => {
     const v = Math.round(((log[t] || 0) + Number(b.dataset.d) * c.step) * 100) / 100;
     if (v) log[t] = v; else delete log[t];
     upsert(state.counters, { ...c, log });
+    popId = `cnt:${id}`;
     commit();
   } else if (act === 'cntdel') remove(state.counters, state.counters.find((x) => x.id === id), 'Contador eliminado');
   else if (act === 'moveall') {
@@ -1758,6 +1844,7 @@ $('#view').addEventListener('click', (e) => {
     const log = { ...h.log };
     if (log[date]) delete log[date]; else log[date] = 1;
     upsert(state.habits, { ...h, log });
+    popId = `hab:${id}`;
     commit();
   } else if (act === 'habdel') {
     remove(state.habits, state.habits.find((x) => x.id === id), 'Hábito eliminado');
@@ -1818,6 +1905,7 @@ sync.start({
   onStatus: (s) => {
     syncInfo = s;
     paintSync();
+    if (view === 'inicio' && s.state === 'on') render();
     if (s.state === 'on' && getPref('notify', '0') === '1' && 'Notification' in window && Notification.permission === 'granted') registerPush();
     if (s.state === 'error') toast('Sin conexión con la nube. Tus datos están a salvo en este dispositivo.');
   },
