@@ -38,9 +38,18 @@ for (const doc of users.docs) {
     total += res.successCount;
   }
 
-  const update = { 'push.sent': prune(sent, localNow(tz).day) };
-  const args = [update];
+  // update() no admite mezclar un objeto con pares campo/valor: todo va en pares.
+  // El token lleva caracteres como ':' que no valen en una ruta con puntos, por eso FieldPath.
+  const args = [new admin.firestore.FieldPath('push', 'sent'), prune(sent, localNow(tz).day)];
   for (const t of dead) args.push(new admin.firestore.FieldPath('push', 'tokens', t), admin.firestore.FieldValue.delete());
-  if (notes.length || dead.size) await doc.ref.update(...args);
+  if (notes.length || dead.size) {
+    try {
+      await doc.ref.update(...args);
+      if (dead.size) console.log(`Tokens caducados borrados: ${dead.size}`);
+    } catch (e) {
+      console.error(`No se pudo guardar el estado de avisos de ${doc.id}: ${e.message}`);
+      process.exitCode = 1;
+    }
+  }
 }
 console.log(`Dispositivos con avisos activados: ${devices} · Avisos enviados: ${total}`);
