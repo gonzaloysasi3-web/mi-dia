@@ -34,6 +34,19 @@ export function aplicar(state, data, now = Date.now()) {
   return out;
 }
 
+// Resumen de correo recortado y ordenado: universidad primero y siempre importante
+export function limpiarCorreo(list, max = 40) {
+  const str = (v, n) => String(v ?? '').slice(0, n);
+  const items = (Array.isArray(list) ? list : []).slice(0, max).map((x) => ({
+    p: [0, 1, 2].includes(x?.p) ? x.p : 1,
+    from: str(x?.from, 80), subject: str(x?.subject, 160), summary: str(x?.summary, 240),
+    thread: /^[\w-]{1,40}$/.test(x?.thread || '') ? x.thread : '',
+    uni: !!x?.uni,
+  }));
+  for (const x of items) if (x.uni) x.p = 2;
+  return items.sort((a, z) => z.p - a.p || z.uni - a.uni);
+}
+
 // El plan del día para la tarjeta de Inicio, recortado a lo que la app pinta
 export function limpiarPlan(p, now = Date.now()) {
   if (!p || !/^\d{4}-\d{2}-\d{2}$/.test(p.date || '')) return null;

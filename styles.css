@@ -1045,3 +1045,8 @@ dialog { background: var(--glass-shine), linear-gradient(var(--glass-strong), va
 .bank-card .bc-back { visibility: hidden; transition: visibility 0s 0.25s; }
 .bank-card.flipped .bc-back { visibility: visible; transition-delay: 0s; }
 .bank-card.flipped .bc-front { visibility: hidden; transition: visibility 0s 0.25s; }
+
+/* Ajustes → Tu Claude */
+.clave-row code { display: inline-block; font-size: 0.875rem; background: var(--bg); padding: 6px 10px; border-radius: 8px; letter-spacing: 0.04em; }
+.set-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.danger-txt { color: var(--hot); }

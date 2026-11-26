@@ -34,6 +34,17 @@ Usa Firebase con el plan gratuito Spark (sin tarjeta). Cada persona entra con su
        match /users/{uid} {
          allow read, write: if request.auth != null && request.auth.uid == uid;
        }
+       // Copia de los datos para el Claude del usuario. El id es su clave secreta: solo quien la sabe puede leerla.
+       match /espejo/{clave} {
+         allow get: if clave.size() >= 32;
+         allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+         allow update: if request.auth != null && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid;
+         allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+       }
+       // Buzón donde el Claude del usuario deja el plan y el resumen de correo. Nadie lo lee; lo vacía el servidor.
+       match /buzon/{clave} {
+         allow create, update: if clave.size() >= 32 && request.resource.data.keys().hasOnly(['correo', 'plan', 'at']);
+       }
      }
    }
    ```

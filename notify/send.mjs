@@ -2,6 +2,7 @@
 // y envía por Firebase Cloud Messaging los avisos que toquen.
 import admin from 'firebase-admin';
 import { due, localNow, prune } from './plan.mjs';
+import { aplicar, limpiarPlan, limpiarCorreo } from './aplicar.mjs';
 
 const key = process.env.FIREBASE_SERVICE_ACCOUNT;
 if (!key) {
@@ -11,6 +12,50 @@ if (!key) {
 admin.initializeApp({ credential: admin.credential.cert(JSON.parse(key)) });
 const db = admin.firestore();
 const DEAD = new Set(['messaging/registration-token-not-registered', 'messaging/invalid-registration-token']);
+
+// Buzones: lo que el Claude de cada usuario deja con su clave (notify/buzon.mjs). La copia espejo/<clave>
+// dice a qué usuario pertenece (solo él puede escribirla). Se aplica, se avisa y se vacía el buzón.
+const push = async (ref, title, body, tag) => {
+  const tokens = Object.keys((await ref.get()).data()?.push?.tokens || {});
+  if (tokens.length) await admin.messaging().sendEachForMulticast({ tokens, data: { title, body, tag, url: './?v=inicio' }, webpush: { headers: { Urgency: 'normal', TTL: '36000' } } });
+};
+try { for (const box of (await db.collection('buzon').get()).docs) {
+  const b = box.data();
+  const esp = await db.doc(`espejo/${box.id}`).get();
+  const uid = esp.exists ? esp.data().uid : null;
+  if (!uid || !(await db.doc(`users/${uid}`).get()).exists) {
+    if (Date.now() - (b.at || 0) > 3 * 864e5) await box.ref.delete(); // buzón sin dueño: se borra a los 3 días
+    continue;
+  }
+  const ref = db.doc(`users/${uid}`);
+  try {
+    if (b.correo) {
+      const items = limpiarCorreo(JSON.parse(b.correo).items);
+      await ref.set({ mail: { at: Date.now(), items } }, { merge: true });
+      const top = items.filter((x) => x.p === 2).length;
+      await push(ref, 'Resumen de correo', items.length ? `${items.length} correos nuevos${top ? `, ${top} importantes` : ''}` : 'No hay correos nuevos', 'mail');
+      console.log(`Buzón: correo guardado (${items.length})`);
+    }
+    if (b.plan) {
+      const data = JSON.parse(b.plan);
+      // Por el buzón solo entran tareas del plan (id plan-…) en items, y los cambios permitidos de aplicar()
+      const add = { items: (data.add?.items || []).filter((x) => /^plan-\d{4}-\d{2}-\d{2}-\d+$/.test(x?.id || '') && x.type === 'task') };
+      const plan = limpiarPlan(data.plan);
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const state = snap.data()?.state ? JSON.parse(snap.data().state) : {};
+        aplicar(state, { add, patch: { items: data.patch?.items || [] } });
+        tx.set(ref, { state: JSON.stringify(state), t: Date.now(), ...(plan ? { plan } : {}) }, { merge: true });
+      });
+      if (plan) await push(ref, 'Tu plan está listo', plan.frog ? `Sapo: ${plan.frog}` : 'Ábrelo en Séneca.', `plan:${plan.date}`);
+      console.log(`Buzón: plan del ${plan?.date} aplicado (${add.items.length} tareas)`);
+    }
+    await box.ref.delete();
+  } catch (e) {
+    console.error(`Buzón con datos no válidos: ${e.message}`);
+    await box.ref.delete();
+  }
+} } catch (e) { console.error(`No se pudieron leer los buzones: ${e.message}`); } // nunca debe parar los avisos
 
 const users = await db.collection('users').get();
 let total = 0;

@@ -4,6 +4,7 @@
 import admin from 'firebase-admin';
 import { createPublicKey } from 'node:crypto';
 import { abrir } from './caja.mjs';
+import { limpiarCorreo } from './aplicar.mjs';
 
 const MAX = 40; // correos como mucho por resumen
 const sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || 'null');
@@ -17,16 +18,7 @@ if (!raw) {
 
 const data = abrir(raw, sa.private_key);
 
-const str = (v, n) => String(v ?? '').slice(0, n);
-const items = (Array.isArray(data.items) ? data.items : []).slice(0, MAX).map((x) => ({
-  p: [0, 1, 2].includes(x.p) ? x.p : 1,
-  from: str(x.from, 80), subject: str(x.subject, 160), summary: str(x.summary, 240),
-  thread: /^[\w-]{1,40}$/.test(x.thread || '') ? x.thread : '',
-  uni: !!x.uni,
-}));
-// Universidad siempre arriba: es importante por definición y va antes que el resto de importantes.
-for (const x of items) if (x.uni) x.p = 2;
-items.sort((a, z) => z.p - a.p || z.uni - a.uni);
+const items = limpiarCorreo(data.items, MAX);
 
 admin.initializeApp({ credential: admin.credential.cert(sa) });
 const user = await admin.auth().getUserByEmail(data.email);

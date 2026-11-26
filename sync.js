@@ -6,6 +6,9 @@ export const enabled = !!cfg;
 export const pushReady = !!(cfg && vapidKey);
 
 let fb, auth, db, user, unsub, timer, hooks, application;
+// «Tu Claude»: con una clave secreta, el Claude del usuario lee una copia de sus datos (espejo/<clave>)
+// y deja el plan y el resumen de correo en su buzón (buzon/<clave>), que el servidor aplica. Ver notify/buzon.mjs.
+let clave = null, lastMail = null, lastMirror = 0;
 
 const stable = (v) => Array.isArray(v) ? v.map(stable)
   : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, stable(v[k])]))
@@ -42,8 +45,12 @@ function listen(u) {
   unsub = fb.onSnapshot(ref, (snap) => {
     const remote = snap.exists() && snap.data().state ? JSON.parse(snap.data().state) : null;
     if (snap.exists()) { hooks.mail?.(snap.data().mail || null); hooks.plan?.(snap.data().plan || null); }
+    lastMail = snap.exists() ? snap.data().mail || null : null;
+    clave = snap.exists() ? snap.data().buzon || null : null;
+    hooks.clave?.(clave);
     const merged = hooks.merge(remote);
     if (!remote || canon(merged) !== canon(remote)) push(merged);
+    else if (clave && Date.now() - lastMirror > 5 * 60000) mirror(merged);
   }, () => hooks.onStatus({ state: 'error' }));
 }
 
@@ -53,7 +60,27 @@ export function push(state) {
   timer = setTimeout(() => {
     fb.setDoc(fb.doc(db, 'users', user.uid), { state: JSON.stringify(state), t: Date.now() }, { merge: true })
       .catch(() => hooks.onStatus({ state: 'error' }));
+    if (clave) mirror(state);
   }, 800);
+}
+
+function mirror(state) {
+  if (!user || !clave) return;
+  lastMirror = Date.now();
+  fb.setDoc(fb.doc(db, 'espejo', clave), {
+    uid: user.uid, state: JSON.stringify(state), mail: lastMail ? JSON.stringify(lastMail) : '',
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone, t: Date.now(),
+  }).catch(() => {});
+}
+
+// Crea, cambia o quita (next = null) la clave. La copia de la clave anterior se borra para que deje de servir.
+export async function setClave(next, state) {
+  if (!user) throw new Error('sync off');
+  const prev = clave;
+  if (prev && prev !== next) await fb.deleteDoc(fb.doc(db, 'espejo', prev)).catch(() => {});
+  await fb.setDoc(fb.doc(db, 'users', user.uid), { buzon: next || fb.deleteField() }, { merge: true });
+  clave = next;
+  if (next) mirror(state);
 }
 
 export async function signIn() {

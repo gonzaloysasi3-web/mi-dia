@@ -22,7 +22,7 @@ HTML, CSS y JavaScript sin framework ni compilación. Los módulos ES se cargan 
 | `sync.js` | Sincronización con Firebase (Auth de Google + Firestore), permiso de Google Calendar y registro para avisos push |
 | `firebase-config.js` | Configuración web de Firebase y clave pública VAPID. No es secreta |
 | `sw.js` | Service worker: caché sin conexión, avisos push y clic en avisos |
-| `notify/` | Script de servidor para avisos con la app cerrada (`plan.mjs` decide, `send.mjs` envía por FCM) |
+| `notify/` | Script de servidor para avisos con la app cerrada (`plan.mjs` decide, `send.mjs` envía por FCM y vacía los buzones de «Tu Claude»), y herramientas de las tareas de Claude (`planificar.mjs`, `buzon.mjs`, `planlib.mjs`) |
 | `.github/workflows/avisos.yml` | Ejecuta `notify/send.mjs` cada 10 min |
 | `.github/workflows/publicar.yml` | Publica en Firebase Hosting al subir a `main` |
 | `.github/workflows/correo.yml` | Recibe el resumen de Gmail cifrado y lo guarda (`notify/correo.mjs`) |
@@ -98,6 +98,14 @@ Tarea programada de Claude «Plan Séneca», cada noche a las 21:49 (Madrid). Di
 4. `users/{uid}.plan = { at, date, text, points[], frog }` llega por `hooks.plan` (`midia.dayplan`) y sale como tarjeta «Plan de hoy/mañana» en Inicio y Hoy (`planHtml()`, la variable es `DAYPLAN`: `PLAN` ya es el plan de estudio). Avisa al móvil.
 
 El aviso «¿Cuál es tu sapo de mañana?» va de 22:15 a 23:15 para no adelantarse al plan.
+
+## Tu Claude (otros usuarios con su propio Claude Pro)
+
+Cualquier usuario puede tener el plan del día y el resumen de Gmail con su propio Claude, sin acceso al repositorio ni a GitHub (nunca hay que dar permiso de escritura: con él se podría sacar la cuenta de servicio y, además, `exportar.yml` acepta cualquier email).
+1. En Ajustes → «Tu Claude» crea una clave secreta (`users/{uid}.buzon`). Desde entonces la app copia su estado a `espejo/<clave>` (`{ uid, state, mail, tz, t }`, `mirror()` en `sync.js`) y «Copiar instrucciones para Claude» (`claudeSetup()`) le da los pasos y el texto de sus dos tareas programadas.
+2. Sus tareas clonan el repositorio público y usan `notify/buzon.mjs` (Firestore por REST con curl; su entorno debe permitir `firestore.googleapis.com`): `leer` baja la copia e imprime el resumen del día, `plan` comprueba el plan con `checkPlan()` (`notify/planlib.mjs`, compartido con `planificar.mjs`) y `correo` lo deja en `buzon/<clave>`.
+3. `notify/send.mjs` (cada 10 min) vacía los buzones: busca el dueño por `espejo/<clave>.uid`, aplica el plan (solo tareas `plan-…` y los cambios de `aplicar()`), guarda el correo y avisa al móvil.
+4. Reglas de Firestore (en `LEEME.md`): `espejo` se lee sin sesión solo sabiendo la clave y solo la escribe su dueño; `buzon` solo se escribe, nadie lo lee. Cambiar o quitar la clave borra la copia antigua.
 
 ## Estado y pendiente
 
