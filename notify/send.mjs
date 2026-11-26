@@ -2,7 +2,7 @@
 // y envía por Firebase Cloud Messaging los avisos que toquen.
 import admin from 'firebase-admin';
 import { due, localNow, prune } from './plan.mjs';
-import { aplicar, limpiarPlan, limpiarCorreo } from './aplicar.mjs';
+import { aplicar, limpiarPlan, limpiarCorreo, limpiarAlta } from './aplicar.mjs';
 
 const key = process.env.FIREBASE_SERVICE_ACCOUNT;
 if (!key) {
@@ -36,7 +36,19 @@ try { for (const box of (await db.collection('buzon').get()).docs) {
       await push(ref, 'Resumen de correo', items.length ? `${items.length} correos nuevos${top ? `, ${top} importantes` : ''}` : 'No hay correos nuevos', 'mail');
       console.log(`Buzón: correo guardado (${items.length})`);
     }
-    if (b.plan) {
+    if (b.plan && JSON.parse(b.plan).alta) {
+      const r = limpiarAlta(JSON.parse(b.plan).alta);
+      if (r.errs) throw new Error(r.errs.join('; '));
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const state = snap.data()?.state ? JSON.parse(snap.data().state) : {};
+        aplicar(state, { add: r.add });
+        tx.set(ref, { state: JSON.stringify(state), t: Date.now() }, { merge: true });
+      });
+      const n = r.add.items.length + r.add.classes.length + r.add.habits.length;
+      await push(ref, 'Séneca está lista', `Claude ha añadido ${n} cosas a tu app`, 'alta');
+      console.log(`Buzón: alta aplicada (${n})`);
+    } else if (b.plan) {
       const data = JSON.parse(b.plan);
       // Por el buzón solo entran tareas del plan (id plan-…) en items, y los cambios permitidos de aplicar()
       const add = { items: (data.add?.items || []).filter((x) => /^plan-\d{4}-\d{2}-\d{2}-\d+$/.test(x?.id || '') && x.type === 'task') };

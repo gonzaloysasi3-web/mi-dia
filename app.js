@@ -1383,6 +1383,20 @@ Es como una contraseña: no la compartas ni la publiques. Si se te escapa, cámb
    - «Correo Séneca»: a las 7:20 y a las 19:20, con el conector Gmail activado.
 4. Lánzalas una vez a mano para probar. En 10-20 minutos el plan o el resumen aparecen en Séneca, con un aviso si tienes los avisos activados.
 
+## Primera vez: llena Séneca con una entrevista (hazlo en esta misma conversación)
+Antes de crear las tareas, entrevístame para que mi app no empiece vacía. Pregunta poco a poco, en bloques cortos, y espera mis respuestas:
+1. Qué estudio, en qué curso y universidad, y si trabajo (en qué y qué horario).
+2. Mi horario de clases: asignatura, días, hora de inicio y fin y aula. Si te paso una foto del horario, sácalo de ahí.
+3. Exámenes y entregas que tengo: asignatura, fecha, hora, aula y temario (los temas, para repartirlos).
+4. Tareas pendientes y cosas que tengo que hacer en las próximas semanas, con su importancia.
+5. Citas o compromisos con fecha.
+6. Hábitos que quiero seguir (gimnasio, leer, estudiar X horas…).
+Después enséñame un resumen y, cuando te diga que sí, escribe /tmp/alta.json y envíalo:
+   { "items": [ { "id": "alta-1", "type": "exam", "title": "Estadística", "date": "AAAA-MM-DD", "time": "09:00", "place": "Aula 3", "subs": ["Tema 1", "Tema 2"] }, { "id": "alta-2", "type": "task", "title": "…", "date": "AAAA-MM-DD", "abc": "A", "rank": 1, "dur": 60 }, { "id": "alta-3", "type": "event", "title": "…", "date": "AAAA-MM-DD", "time": "18:00" } ], "classes": [ { "id": "alta-c1", "name": "Estadística", "days": [1, 3], "start": "15:00", "end": "16:30", "place": "Aula 101" } ], "habits": [ { "id": "alta-h1", "name": "Gimnasio" } ] }
+   (type: task, exam o event; days: 0 = domingo, 1 = lunes … 6 = sábado; ids distintos que empiecen por «alta-»; las tareas sin fecha concreta, pon la de mañana.)
+   \`git clone -q --depth 1 ${repo} /tmp/seneca && cd /tmp/seneca && node notify/buzon.mjs alta ${c} /tmp/alta.json\`
+Si da errores, corrige el archivo y repite. En 10-20 minutos aparece todo en Séneca. Usa lo que te cuente también para añadir un párrafo sobre mí al principio del texto de «Plan Séneca».
+
 ## Texto de la tarea «Plan Séneca»
 Eres la tarea «Plan Séneca»: planifica mi día SIGUIENTE en mi app Séneca. Trabaja solo, sin preguntar nada. Todo en español.
 1. Prepara: \`git clone -q --depth 1 ${repo} /tmp/seneca && cd /tmp/seneca\` y \`W=/tmp/plan; rm -rf $W; mkdir -p $W\`.

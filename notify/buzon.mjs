@@ -4,15 +4,19 @@
 //                                                             <carpeta>/estado.json e imprime el resumen del día a planificar
 //   node notify/buzon.mjs plan   <clave> <carpeta> <plan.json> → comprueba el plan y lo deja en su buzón
 //   node notify/buzon.mjs correo <clave> <resumen.json>      → deja el resumen de correo en su buzón
+//   node notify/buzon.mjs alta   <clave> <alta.json>         → primera vez: tareas, exámenes, citas, horario y hábitos
+//                                                             que Claude ha sacado de una entrevista (ids «alta-…»)
 // plan.json = { date, add: { items: [...] }, patch: { items: [...] }, plan: { date, text, points[], frog } }
 // resumen.json = { items: [{ p, uni, from, subject, summary, thread }] }
+// alta.json = { items: [{ id: 'alta-…', type: 'task'|'exam'|'event', title, date, time, place, abc, dur, subs[] }],
+//               classes: [{ id, name, days: [1-5], start, end, place }], habits: [{ id, name }] }
 // El servidor (notify/send.mjs, cada 10 min) recoge el buzón, lo aplica a su cuenta y le avisa al móvil.
 // Habla con Firestore por REST con curl (respeta el proxy). Las reglas solo dejan leer la copia y escribir el buzón
 // a quien conoce la clave; nadie puede leer el buzón ni tocar los datos de otro.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { checkPlan, digest } from './planlib.mjs';
-import { limpiarCorreo } from './aplicar.mjs';
+import { limpiarCorreo, limpiarAlta } from './aplicar.mjs';
 
 const BASE = 'https://firestore.googleapis.com/v1/projects/mi-dia-467b1/databases/(default)/documents';
 const [cmd, clave, a2, a3] = process.argv.slice(2);
@@ -56,4 +60,11 @@ if (cmd === 'leer') {
   const items = limpiarCorreo(JSON.parse(readFileSync(a2, 'utf8')).items);
   drop('correo', { items });
   console.log(`Resumen enviado: ${items.length} correos (${items.filter((x) => x.p === 2).length} importantes). Llegará a Séneca en los próximos 10-20 minutos.`);
-} else fail('Orden desconocida: usa leer, plan o correo.');
+} else if (cmd === 'alta') {
+  if (!a2) fail('Uso: node notify/buzon.mjs alta <clave> <alta.json>');
+  const r = limpiarAlta(JSON.parse(readFileSync(a2, 'utf8')));
+  if (r.errs) fail('Alta con errores:\n- ' + r.errs.join('\n- '));
+  drop('plan', { alta: r.add });
+  const t = (k) => r.add.items.filter((x) => x.type === k).length;
+  console.log(`Alta enviada: ${t('task')} tareas, ${t('exam')} exámenes, ${t('event')} citas, ${r.add.classes.length} clases y ${r.add.habits.length} hábitos. Llegará a Séneca en los próximos 10-20 minutos.`);
+} else fail('Orden desconocida: usa leer, plan, correo o alta.');
