@@ -566,7 +566,7 @@ function blocksHtml(todays) {
   const timed = todays.filter((i) => i.time);
   const first = Math.min(7, ...timed.map((i) => Number(i.time.slice(0, 2))));
   const chip = (i, label) => `<button type="button" class="block${i.done ? ' done' : ''}" draggable="true" data-act="bsel" data-id="${i.id}" aria-pressed="${blockSel === i.id}">${label}</button>`;
-  let html = `<p class="note">Arrastra una tarea a una hora, o tócala y después toca la hora. Si tocas una hora sin elegir nada, creas algo nuevo a esa hora.</p>
+  let html = `<p class="note">Arrastra una tarea a una hora.</p>
     <h2 class="sec">Sin hora</h2>
     <div class="loose" data-drop="">${loose.length ? loose.map((i) => chip(i, esc(i.title))).join('') : '<span class="free">Todo tiene hora.</span>'}</div>
     <ol class="hours">`;
@@ -1357,14 +1357,6 @@ function viewRevision() {
 }
 
 /* ---------- Ajustes: avisos, Google Calendar y atajos ---------- */
-function pushNote(on) {
-  if (!on) return 'Al activarlos, llegan también con la app cerrada si has iniciado sesión con la nube.';
-  if (getPref('pushToken', '')) return 'Activados en este dispositivo, también con la app cerrada. Pueden llegar con unos minutos de retraso.';
-  if (!sync.pushReady) return 'Ahora llegan con la app abierta o en segundo plano. Para recibirlos con la app cerrada falta configurar el servidor.';
-  if (syncInfo.state !== 'on') return 'Ahora llegan con la app abierta. Inicia sesión con la nube para recibirlos también con la app cerrada.';
-  return 'Ahora llegan con la app abierta. Desactiva y vuelve a activar el interruptor para recibirlos también con la app cerrada.';
-}
-
 /* ---------- Tu Claude: plan del día y resumen de correo con el Claude del propio usuario ---------- */
 let CLAVE = null;
 const newClave = () => { const b = crypto.getRandomValues(new Uint8Array(30)); return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
@@ -1418,14 +1410,12 @@ Eres la tarea «Correo Séneca»: resume mi correo para mi app Séneca. Trabaja 
 `;
 }
 function claudeHtml() {
-  if (syncInfo.state !== 'on') return '<p class="note">Primero inicia sesión con el icono de la nube: el plan y el resumen de correo llegan a tu cuenta.</p>';
-  if (!CLAVE) return `<p class="note">Si tienes Claude Pro, tu Claude puede prepararte cada noche el plan del día siguiente y dos veces al día un resumen de tu Gmail, y Séneca los recibe solos. Para eso tu Claude necesita una clave secreta tuya.</p>
-    <button type="button" class="btn" data-act="clavenew">Crear mi clave</button>`;
-  return `<p class="note">Tu clave está creada. Copia las instrucciones, pégalas en un sitio que veas desde el ordenador y sigue los pasos: son unos 10 minutos.</p>
-    <div class="clave-row"><code>${esc(CLAVE.slice(0, 6))}••••••••${esc(CLAVE.slice(-4))}</code></div>
-    <div class="set-btns"><button type="button" class="btn" data-act="clavecopy">Copiar instrucciones para Claude</button>
-    <button type="button" class="text-btn" data-act="clavenew">Cambiar clave</button><button type="button" class="text-btn danger-txt" data-act="claveoff">Quitar</button></div>
-    <p class="note">La clave da acceso a tus datos de Séneca a quien la tenga. Si la cambias, las tareas de Claude con la clave antigua dejan de funcionar hasta que pegues la nueva.</p>`;
+  if (syncInfo.state !== 'on') return '<p class="note">Inicia sesión con la nube para usarlo.</p>';
+  if (!CLAVE) return `<p class="note">Tu Claude prepara cada noche el plan del día y el resumen de Gmail.</p>
+    <button type="button" class="btn" data-act="clavenew">Crear clave</button>`;
+  return `<div class="clave-row"><code>${esc(CLAVE.slice(0, 6))}••••••••${esc(CLAVE.slice(-4))}</code></div>
+    <div class="set-btns"><button type="button" class="btn" data-act="clavecopy">Copiar instrucciones</button>
+    <button type="button" class="text-btn" data-act="clavenew">Cambiar</button><button type="button" class="text-btn danger-txt" data-act="claveoff">Quitar</button></div>`;
 }
 
 function viewAjustes() {
@@ -1446,10 +1436,9 @@ function viewAjustes() {
     <div class="group setting">
       <div class="set-row">
         <div><p class="title">Avisos de citas y exámenes</p>
-          <p class="meta">10 minutos antes de lo que tenga hora, el día antes de cada examen y un resumen por la mañana.</p></div>
+          <p class="meta">Citas, exámenes y el plan del día.</p></div>
         <button type="button" class="switch" role="switch" aria-checked="${notifOn}" data-act="notify" aria-label="Avisos de citas y exámenes" ${perm === 'unsupported' ? 'disabled' : ''}></button>
       </div>
-      <p class="note">${pushNote(notifOn)}</p>
       ${perm === 'denied' ? '<p class="note warn">El navegador tiene los avisos bloqueados para esta web. Actívalos en los ajustes del navegador.</p>' : ''}
       ${perm === 'unsupported' ? '<p class="note warn">Este navegador no permite avisos. En iPhone hay que instalar la app en la pantalla de inicio primero.</p>' : ''}
     </div>
@@ -1458,14 +1447,11 @@ function viewAjustes() {
     <h2 class="sec">Google Calendar</h2>
     <div class="group setting">
       <div class="set-row"><div><p class="title">Ver mis eventos de Google</p><p class="meta">${gText}</p></div>${gBtn}</div>
-      <p class="note">Solo lectura: tus eventos aparecen en Hoy, Semana y el calendario, sin duplicarse. La primera vez, activa la API de Google Calendar en tu proyecto:
-        <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com?project=mi-dia-467b1" target="_blank" rel="noopener">abrir Google Cloud y pulsar «Habilitar»</a>.
-        Google mostrará un aviso de «app no verificada»: es tu propia app, puedes continuar.</p>
+      <p class="note"><a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com?project=mi-dia-467b1" target="_blank" rel="noopener">Activar la API de Google Calendar</a></p>
     </div>
     <h2 class="sec">Atajos</h2>
     <div class="group setting">
-      <p class="note">En Android, mantén pulsado el icono de la app para ver los atajos Hoy, Añadir y Semana.</p>
-      <p class="note">En iPhone, abre la app Atajos, crea un atajo con la acción «Abrir URL» y una de estas direcciones. Después añádelo a la pantalla de inicio o como widget de Atajos.</p>
+      <p class="note">Android: mantén pulsado el icono. iPhone: app Atajos, acción «Abrir URL».</p>
       <ul class="urls">
         <li><span>Hoy</span><code>${esc(appUrl)}?v=hoy</code></li>
         <li><span>Añadir</span><code>${esc(appUrl)}?add=1</code></li>
